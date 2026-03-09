@@ -1,0 +1,38 @@
+name: SecOS CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          pip install flake8 bandit
+      
+      - name: Lint with flake8
+        run: |
+          flake8 agents/*.py --max-line-length=120 --ignore=E501,W503 || true
+      
+      - name: Security scan with bandit
+        run: |
+          bandit -r agents/ -ll --exclude agents/nohup.out || true
+      
+      - name: Check for secrets
+        run: |
+          if grep -r "gsk_\|sk-ant\|ghp_\|AKIA" agents/ 2>/dev/null; then
+            echo "ERROR: API keys found in source!"
+            exit 1
+          fi
+          echo "Clean — no secrets found"
