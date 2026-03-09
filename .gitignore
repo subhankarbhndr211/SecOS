@@ -1,0 +1,36 @@
+# Secrets — NEVER commit
+.env
+*.env
+!.env.example
+/etc/secos/
+secrets/
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Logs
+*.log
+logs/
+
+# Database
+*.sql
+*.dump
+*.db
+
+# Runtime
+*.pid
+/run/
+
+# Archives
+*.tar.gz
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp

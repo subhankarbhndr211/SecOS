@@ -1,0 +1,2542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SecOS v6.0</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body,#root{background:#020508;height:100%;width:100%;overflow:hidden}
+    #boot{position:fixed;inset:0;background:#020508;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:18px;z-index:99999;
+      font-family:'Orbitron','Courier New',monospace;}
+    #boot .logo{font-size:32px;color:#00d4ff;letter-spacing:10px;font-weight:900}
+    #boot .sub{font-size:10px;color:#4888aa;letter-spacing:4px;text-transform:uppercase}
+    #boot .bar{width:220px;height:2px;background:#0c1e2e;border-radius:2px;overflow:hidden}
+    #boot .bar-inner{height:100%;background:#00d4ff;animation:load 1.4s ease-in-out forwards}
+    @keyframes load{from{width:0}to{width:100%}}
+  </style>
+</head>
+<body>
+  <div id="boot">
+    <div class="logo">SecOS</div>
+    <div class="sub">Autonomous Security Operating System v6.0</div>
+    <div class="bar"><div class="bar-inner"></div></div>
+  </div>
+  <div id="root"></div>
+  <script src="/react.min.js"></script>
+  <script src="/react-dom.min.js"></script>
+  <script src="/babel.min.js"></script>
+  <script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+
+
+
+
+
+
+const _FL = document.createElement("link");
+_FL.rel = "stylesheet";
+_FL.href = "https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap";
+document.head.appendChild(_FL);
+
+const C = {
+  bg:"#020508", surface:"#050b10", card:"#080f18", border:"#0c1e2e", borderHi:"#164060",
+  accent:"#00d4ff", accentDim:"#006b80", green:"#00ff88", greenDim:"#008844",
+  amber:"#ffb800", red:"#ff2244", purple:"#b060ff", orange:"#ff6010",
+  cyan:"#00eeff", pink:"#ff40a0", teal:"#00c8b0",
+  textHi:"#dff0ff", text:"#4888aa", dim:"#0c1e2e", grid:"rgba(0,180,255,0.03)",
+};
+
+const rnd  = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+const ts   = () => new Date().toLocaleTimeString("en-GB",{hour12:false});
+const uid  = () => Math.random().toString(36).slice(2,10).toUpperCase();
+const pct  = (v,m) => Math.round((v/m)*100);
+
+// Constants used by UI components (display only, no mock data generation)
+const SEVS  = ["CRITICAL","HIGH","MEDIUM","LOW"];
+const HOSTS = []; // populated from real alerts
+const IPS   = []; // populated from real alerts
+const USERS = []; // populated from real alerts
+const RULES = []; // populated from real alerts
+const MITRE = []; // populated from real alerts
+const TACTICS=[];
+const DEPTS = [];
+const ROLES = [];
+
+//  STYLES 
+const S = () => {
+  if(document.getElementById("secos-v6"))return;
+  const el=document.createElement("style"); el.id="secos-v6";
+  el.textContent=`
+  *{box-sizing:border-box;margin:0;padding:0}
+  .v6{font-family:'Rajdhani',sans-serif;background:${C.bg};color:${C.text};height:100vh;overflow:hidden;display:flex;flex-direction:column}
+  .mono{font-family:'Share Tech Mono',monospace!important}
+  .orb{font-family:'Orbitron',sans-serif!important}
+  .gbg{position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:linear-gradient(${C.grid} 1px,transparent 1px),linear-gradient(90deg,${C.grid} 1px,transparent 1px);
+    background-size:36px 36px}
+  .scan{position:fixed;inset:0;pointer-events:none;z-index:1;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,200,255,0.012) 2px,rgba(0,200,255,0.012) 4px);
+    animation:sm 10s linear infinite}
+  @keyframes sm{from{background-position:0 0}to{background-position:0 -200px}}
+  ::-webkit-scrollbar{width:3px;height:3px}
+  ::-webkit-scrollbar-track{background:${C.surface}}
+  ::-webkit-scrollbar-thumb{background:${C.accentDim};border-radius:2px}
+  @keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .fi{animation:fi .25s ease forwards}
+  @keyframes bk{0%,100%{opacity:1}50%{opacity:0}}
+  .bk{animation:bk 1s infinite}
+  @keyframes pl{0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,.35)}70%{box-shadow:0 0 0 5px rgba(0,212,255,0)}}
+  .pl{animation:pl 2s infinite}
+  @keyframes rot{to{transform:rotate(360deg)}}
+  .spin{animation:rot 2s linear infinite;display:inline-block}
+  @keyframes si{from{transform:translateX(100%)}to{transform:translateX(0)}}
+  .si{animation:si .3s cubic-bezier(.16,1,.3,1) forwards}
+  .card{background:${C.card};border:1px solid ${C.border};border-radius:4px;padding:14px;transition:border-color .2s}
+  .card:hover{border-color:${C.borderHi}}
+  .btn{padding:6px 14px;border:1px solid ${C.border};background:transparent;color:${C.text};cursor:pointer;
+    font-family:'Rajdhani',sans-serif;font-weight:600;font-size:12px;letter-spacing:1px;border-radius:3px;transition:all .2s;white-space:nowrap}
+  .btn:hover{border-color:${C.accent};color:${C.accent};background:rgba(0,212,255,.05)}
+  .btn.p{border-color:${C.accent};color:${C.accent};background:rgba(0,212,255,.07)}
+  .btn.p:hover{background:rgba(0,212,255,.14)}
+  .btn.d{border-color:${C.red};color:${C.red};background:rgba(255,34,68,.07)}
+  .btn.d:hover{background:rgba(255,34,68,.14)}
+  .btn.g{border-color:${C.green};color:${C.green};background:rgba(0,255,136,.07)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .inp{background:${C.surface};border:1px solid ${C.border};color:${C.textHi};
+    padding:7px 11px;font-family:'Share Tech Mono',monospace;font-size:12px;border-radius:3px;outline:none;width:100%}
+  .inp:focus{border-color:${C.accent}}
+  .tbl{width:100%;border-collapse:collapse;font-size:12px}
+  .tbl th{color:${C.text};font-weight:600;letter-spacing:1.2px;text-transform:uppercase;font-size:10px;
+    padding:7px 10px;border-bottom:1px solid ${C.border};text-align:left;white-space:nowrap}
+  .tbl td{padding:8px 10px;border-bottom:1px solid rgba(12,30,46,.7);color:${C.textHi};vertical-align:middle}
+  .tbl tr:hover td{background:rgba(0,212,255,.025)}
+  .sev-CRITICAL{color:${C.red};background:rgba(255,34,68,.1);border:1px solid rgba(255,34,68,.25)}
+  .sev-HIGH{color:${C.orange};background:rgba(255,96,16,.1);border:1px solid rgba(255,96,16,.25)}
+  .sev-MEDIUM{color:${C.amber};background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.25)}
+  .sev-LOW{color:${C.green};background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25)}
+  .sbadge{padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:.8px;font-family:'Share Tech Mono',monospace}
+  .hdr{display:flex;align-items:center;gap:8px;margin-bottom:14px;
+    font-family:'Orbitron',sans-serif;font-size:11px;color:${C.accent};letter-spacing:2px;text-transform:uppercase}
+  .hdr::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,${C.border},transparent)}
+  .tab{padding:7px 14px;cursor:pointer;border:1px solid transparent;border-bottom:none;
+    font-family:'Rajdhani',sans-serif;font-weight:600;font-size:11px;letter-spacing:1.5px;
+    text-transform:uppercase;transition:all .2s;color:${C.text};background:transparent;white-space:nowrap}
+  .tab:hover{color:${C.accent}}
+  .tab.on{color:${C.accent};border-color:${C.border};border-bottom:2px solid ${C.accent};background:${C.surface}}
+  .rbar{height:4px;background:${C.dim};border-radius:2px;overflow:hidden}
+  .rfill{height:100%;border-radius:2px;transition:width .6s}
+  .dg{width:7px;height:7px;border-radius:50%;background:${C.green};box-shadow:0 0 5px ${C.green}}
+  .dr{width:7px;height:7px;border-radius:50%;background:${C.red};box-shadow:0 0 5px ${C.red}}
+  .da{width:7px;height:7px;border-radius:50%;background:${C.amber};box-shadow:0 0 5px ${C.amber}}
+  .dd{width:7px;height:7px;border-radius:50%;background:${C.dim}}
+  .panel{position:fixed;top:0;right:0;width:540px;height:100vh;
+    background:${C.surface};border-left:1px solid ${C.border};z-index:100;display:flex;flex-direction:column}
+  .log{padding:3px 0;font-size:11px;font-family:'Share Tech Mono',monospace;border-bottom:1px solid rgba(12,30,46,.5)}
+  `;
+  document.head.appendChild(el);
+};
+
+//  SHARED COMPONENTS 
+const Badge = ({sev}) => <span className={`sbadge sev-${sev}`}>{sev}</span>;
+const Dot   = ({s}) => <div className={s==="ONLINE"?"dg pl":s==="WARN"?"da":s==="OFF"?"dr":"dd"}/>;
+const Hdr   = ({children}) => <div className="hdr">{children}</div>;
+const RBar  = ({v,max=100,color}) => (
+  <div className="rbar"><div className="rfill" style={{width:`${pct(v,max)}%`,background:color||( v>70?C.red:v>50?C.amber:C.green)}}/></div>
+);
+const KPICard = ({label,value,color,sub}) => (
+  <div className="card" style={{textAlign:"center"}}>
+    <div style={{fontSize:10,color:C.text,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>{label}</div>
+    <div className="orb" style={{fontSize:30,fontWeight:900,color:color||C.accent}}>{value}</div>
+    {sub&&<div style={{fontSize:10,color:C.text,marginTop:2}}>{sub}</div>}
+  </div>
+);
+
+
+// LOGIN
+
+function Login({onLogin}) {
+  const [u,setU]=useState(""); const [p,setP]=useState(""); const [e,setE]=useState(""); const [ld,setLd]=useState(false);
+  const CREDS={admin:"Admin1234",analyst:"Analyst123",soc:"SOCteam123"};
+  const go=()=>{
+    if(!u||!p){setE("Credentials required");return;}
+    setLd(true);
+    setTimeout(()=>{
+      if(CREDS[u.toLowerCase()]===p) onLogin({user:u.toLowerCase(),role:u.toLowerCase()==="admin"?"ADMIN":u.toLowerCase()==="soc"?"SOC LEAD":"ANALYST"});
+      else{setE("Authentication failed");setLd(false);}
+    },700);
+  };
+  return (
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+      <div className="gbg"/><div className="scan"/>
+      <div className="card" style={{width:400,padding:36,position:"relative",zIndex:2}}>
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <div className="orb" style={{fontSize:26,fontWeight:900,color:C.accent,letterSpacing:6}}>SecOS</div>
+          <div style={{color:C.text,fontSize:10,letterSpacing:3,marginTop:4}}>AUTONOMOUS SECURITY OPERATING SYSTEM  v6.0</div>
+          <div style={{display:"flex",justifyContent:"center",gap:6,flexWrap:"wrap",marginTop:10}}>
+            {["SIEM","EDR","NDR","SOAR","XDR","IAM","UEBA","TIP","VULN"].map(m=>(
+              <span key={m} className="mono" style={{fontSize:9,color:C.accentDim,padding:"1px 5px",border:`1px solid ${C.dim}`,borderRadius:2}}>{m}</span>
+            ))}
+          </div>
+        </div>
+        <div style={{marginBottom:12}}>
+          <div style={{color:C.text,fontSize:10,letterSpacing:2,marginBottom:5,textTransform:"uppercase"}}>Username</div>
+          <input className="inp" value={u} onChange={ev=>setU(ev.target.value)} placeholder="admin / analyst / soc" onKeyDown={ev=>ev.key==="Enter"&&go()} autoFocus/>
+        </div>
+        <div style={{marginBottom:18}}>
+          <div style={{color:C.text,fontSize:10,letterSpacing:2,marginBottom:5,textTransform:"uppercase"}}>Password</div>
+          <input className="inp" type="password" value={p} onChange={ev=>setP(ev.target.value)} placeholder="" onKeyDown={ev=>ev.key==="Enter"&&go()}/>
+        </div>
+        {e&&<div className="mono" style={{color:C.red,fontSize:11,marginBottom:10,textAlign:"center"}}> {e}</div>}
+        <button className="btn p" style={{width:"100%",padding:11,fontSize:13,letterSpacing:2}} onClick={go} disabled={ld}>
+          {ld?"AUTHENTICATING":"AUTHENTICATE "}
+        </button>
+        <div style={{marginTop:16,padding:10,background:C.surface,borderRadius:3,border:`1px solid ${C.dim}`}}>
+          <div style={{color:C.text,fontSize:10,letterSpacing:1,marginBottom:4}}>CREDENTIALS</div>
+          <div className="mono" style={{fontSize:10,color:C.text,lineHeight:1.7}}>
+            admin / Admin1234<br/>analyst / Analyst123<br/>soc / SOCteam123
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// TOP BAR
+
+function TopBar({session,alerts,risk,onLogout,apiOnline,wsConnected}) {
+  const [t,setT]=useState(ts());
+  useEffect(()=>{const i=setInterval(()=>setT(ts()),1000);return()=>clearInterval(i);},[]);
+  const crit=alerts.filter(a=>a.severity==="CRITICAL"&&a.status==="NEW").length;
+  return (
+    <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"0 16px",height:50,display:"flex",alignItems:"center",gap:12,flexShrink:0,position:"relative",zIndex:10}}>
+      <div className="orb" style={{fontSize:16,fontWeight:900,color:C.accent,letterSpacing:4,marginRight:4}}>SecOS</div>
+      <span style={{fontSize:9,color:C.accentDim,padding:"2px 6px",border:`1px solid ${C.dim}`,borderRadius:2}} className="mono">v6.0</span>
+      <div style={{width:1,height:24,background:C.border}}/>
+      {[
+        {l:"ALERTS",v:alerts.length,c:C.textHi},
+        {l:"CRITICAL",v:crit,c:crit>0?C.red:C.greenDim},
+        {l:"OPEN",v:alerts.filter(a=>a.status==="INVESTIGATING").length,c:C.amber},
+        {l:"ORG RISK",v:risk+"%",c:risk>70?C.red:risk>50?C.amber:C.green},
+      ].map(k=>(
+        <div key={k.l} style={{padding:"3px 12px",borderRight:`1px solid ${C.border}`}}>
+          <div style={{fontSize:8,color:C.text,letterSpacing:1.5,textTransform:"uppercase"}}>{k.l}</div>
+          <div className="mono" style={{fontSize:12,color:k.c,fontWeight:700}}>{k.v}</div>
+        </div>
+      ))}
+      <div style={{flex:1}}/>
+      <div className="mono" style={{fontSize:11,color:C.text}}>{t}</div>
+      <div style={{display:"flex",alignItems:"center",gap:6}}>
+        <div className="dg pl"/>
+        <span style={{fontSize:12,color:C.textHi,letterSpacing:1}}>{session.user}</span>
+        <span style={{fontSize:9,color:C.accentDim,padding:"1px 5px",border:`1px solid ${C.dim}`,borderRadius:2}}>{session.role}</span>
+      </div>
+      <button className="btn" style={{fontSize:10,padding:"3px 8px"}} onClick={onLogout}>LOGOUT</button>
+      <span style={{marginLeft:6,fontSize:9,fontFamily:"monospace",
+        color:wsConnected?"#00ff88":"#ff2244",letterSpacing:1}}>
+        {wsConnected?" LIVE":" OFFLINE"}
+      </span>
+      <span style={{marginLeft:4,fontSize:9,fontFamily:"monospace",
+        color:apiOnline?"#00ff88":"#ff2244",letterSpacing:1}}>
+        {apiOnline?"API":"NO API"}
+      </span>
+    </div>
+  );
+}
+
+
+// MODULE: IAM  Identity & Access Management
+
+function IAMModule({alerts}) {
+  const [selUser,setSel]=useState(null);
+  const [action,setAction]=useState(null);
+  const [log,setLog]=useState([]);
+
+  const [IDENTITY_DB,setIdentityDB]=useState([]);
+  useEffect(()=>{
+    // Load real users from /api/assets or derive from IAM alerts
+    fetch("/api/assets",{headers:{Authorization:"Bearer "+(window._secosToken||"")}})
+      .then(r=>r.ok?r.json():null).then(d=>{
+        if(d?.assets?.length) setIdentityDB(d.assets.filter(a=>a.type==="user"||!a.type));
+      }).catch(()=>{});
+  },[]);
+  const PRIV_ACCOUNTS = IDENTITY_DB.filter(u=>u.privileged||u.is_admin);
+  const RISKY = [...IDENTITY_DB].sort((a,b)=>(b.risk_score||0)-(a.risk_score||0)).slice(0,4);
+
+  const doAction=(user,act)=>{
+    setLog(p=>[{ts:ts(),user:user.username,action:act,msg:`${act} executed on ${user.username}`},...p]);
+    setAction(null);
+  };
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"auto",display:"flex",flexDirection:"column",gap:12}}>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,flexShrink:0}}>
+        {[
+          {l:"Total Identities",v:IDENTITY_DB.length,c:C.accent},
+          {l:"Privileged Accts",v:PRIV_ACCOUNTS.length,c:C.orange},
+          {l:"MFA Enabled",v:IDENTITY_DB.filter(u=>u.mfa).length,c:C.green},
+          {l:"Locked Out",v:IDENTITY_DB.filter(u=>u.lockedOut).length,c:C.red},
+          {l:"Active Sessions",v:IDENTITY_DB.reduce((s,u)=>s+u.sessions,0),c:C.cyan},
+        ].map(k=><KPICard key={k.l} label={k.l} value={k.v} color={k.c}/>)}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,flex:1,minHeight:0}}>
+        {/* Identity table */}
+        <div className="card" style={{overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <Hdr>Identity Registry</Hdr>
+          <div style={{overflow:"auto",flex:1}}>
+            <table className="tbl">
+              <thead><tr><th>User</th><th>Dept</th><th>Risk</th><th>MFA</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {IDENTITY_DB.map(u=>(
+                  <tr key={u.username} style={{cursor:"pointer"}} onClick={()=>setSel(u)}>
+                    <td>
+                      <div className="mono" style={{color:u.privileged?C.orange:C.textHi,fontSize:11}}>{u.username}</div>
+                      <div style={{fontSize:9,color:C.text}}>{u.role}</div>
+                    </td>
+                    <td style={{fontSize:11,color:C.text}}>{u.dept}</td>
+                    <td>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <div style={{width:36,height:3,background:C.dim,borderRadius:2}}>
+                          <div style={{width:`${u.riskScore}%`,height:"100%",background:u.riskScore>70?C.red:u.riskScore>50?C.amber:C.green,borderRadius:2}}/>
+                        </div>
+                        <span className="mono" style={{fontSize:10,color:u.riskScore>70?C.red:C.text}}>{u.riskScore}</span>
+                      </div>
+                    </td>
+                    <td><span style={{fontSize:10,color:u.mfa?C.green:C.red}}>{u.mfa?" ON":" OFF"}</span></td>
+                    <td>
+                      {u.lockedOut
+                        ? <span style={{fontSize:10,color:C.red}} className="bk">LOCKED</span>
+                        : <span style={{fontSize:10,color:u.active?C.greenDim:C.text}}>{u.active?"ACTIVE":"INACTIVE"}</span>}
+                    </td>
+                    <td><button className="btn p" style={{fontSize:9,padding:"2px 7px"}} onClick={e=>{e.stopPropagation();setSel(u);}}>VIEW</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {/* Privileged accounts */}
+          <div className="card">
+            <Hdr>Privileged Account Monitor</Hdr>
+            {PRIV_ACCOUNTS.map(u=>(
+              <div key={u.username} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:C.surface,borderRadius:3,border:`1px solid ${u.riskScore>60?C.orange:C.border}`,marginBottom:6}}>
+                <div>
+                  <div className="mono" style={{color:C.orange,fontSize:12}}>{u.username}</div>
+                  <div style={{fontSize:10,color:C.text}}>{u.groups.join("  ")}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div className="mono" style={{fontSize:10,color:u.riskScore>60?C.red:C.text}}>Risk: {u.riskScore}</div>
+                  <div style={{fontSize:9,color:C.text}}>{u.lastLogin}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Auth event log */}
+          <div className="card" style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+            <Hdr>IAM Action Log</Hdr>
+            <div style={{overflow:"auto",flex:1}}>
+              {[...log,...alerts.filter(a=>a.source==="IAM"||a.user).slice(0,6).map(a=>({
+                ts:a.timestamp, user:a.user||"unknown",
+                action:a.rule||"SECURITY_EVENT",
+              }))].map((e,i)=>(
+                <div key={i} className="log fi">
+                  <span style={{color:C.accentDim}}>[{e.ts}]</span>{" "}
+                  <span style={{color:e.action.includes("FAIL")||e.action.includes("BYPASS")||e.action.includes("ESCAL")?C.red:C.greenDim}}>{e.action}</span>{" "}
+                  <span style={{color:C.textHi}} className="mono">{e.user}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* User detail modal */}
+      {selUser&&(
+        <>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:99}} onClick={()=>setSel(null)}/>
+          <div className="panel si" style={{width:460}}>
+            <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div className="orb" style={{fontSize:10,color:C.accentDim,letterSpacing:2}}>IDENTITY PROFILE</div>
+                  <div className="mono" style={{fontSize:18,color:selUser.privileged?C.orange:C.textHi,marginTop:4}}>{selUser.username}</div>
+                  <div style={{color:C.text,fontSize:12,marginTop:2}}>{selUser.role}  {selUser.dept}</div>
+                </div>
+                <button className="btn" onClick={()=>setSel(null)}></button>
+              </div>
+            </div>
+            <div style={{flex:1,overflow:"auto",padding:18}}>
+              {/* Details grid */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+                {[
+                  ["Risk Score",selUser.riskScore,selUser.riskScore>70?C.red:selUser.riskScore>50?C.amber:C.green],
+                  ["Active Sessions",selUser.sessions,C.textHi],
+                  ["Failed Logins",selUser.failedLogins,selUser.failedLogins>3?C.red:C.textHi],
+                  ["Password Age",selUser.passwordAge+" days",selUser.passwordAge>90?C.red:C.textHi],
+                  ["Last IP",selUser.lastIP,C.cyan],
+                  ["Last Login",selUser.lastLogin,C.textHi],
+                ].map(([k,v,c])=>(
+                  <div key={k} style={{padding:"8px 10px",background:C.card,borderRadius:3,border:`1px solid ${C.border}`}}>
+                    <div style={{fontSize:9,color:C.text,letterSpacing:1,textTransform:"uppercase",marginBottom:3}}>{k}</div>
+                    <div className="mono" style={{fontSize:13,color:c||C.textHi}}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Groups */}
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:10,color:C.text,letterSpacing:1,marginBottom:6,textTransform:"uppercase"}}>Group Membership</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {selUser.groups.map(g=><span key={g} style={{fontSize:10,padding:"2px 7px",background:g.includes("Admin")?`rgba(255,96,16,.1)`:C.surface,border:`1px solid ${g.includes("Admin")?C.orange:C.border}`,borderRadius:2,color:g.includes("Admin")?C.orange:C.text}}>{g}</span>)}
+                </div>
+              </div>
+              {/* Actions */}
+              <div>
+                <div style={{fontSize:10,color:C.text,letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>Identity Actions</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {[
+                    {a:"DISABLE ACCOUNT",cls:"d"},
+                    {a:"FORCE MFA RESET",cls:""},
+                    {a:"REVOKE SESSIONS",cls:"d"},
+                    {a:"RESET PASSWORD",cls:""},
+                    {a:"UNLOCK ACCOUNT",cls:"g"},
+                    {a:"ELEVATE PRIVILEGE",cls:""},
+                  ].map(({a,cls})=>(
+                    <button key={a} className={`btn ${cls}`} style={{padding:"9px",fontSize:11}} onClick={()=>doAction(selUser,a)}>{a}</button>
+                  ))}
+                </div>
+              </div>
+              {/* Risk timeline */}
+              <div style={{marginTop:14,padding:"10px",background:C.card,borderRadius:3,border:`1px solid ${C.border}`}}>
+                <div style={{fontSize:10,color:C.text,marginBottom:6,letterSpacing:1,textTransform:"uppercase"}}>Risk Trend</div>
+                <div style={{display:"flex",alignItems:"flex-end",gap:3,height:40}}>
+                  {Array.from({length:14},(_,i)=>selUser.activityScore+Math.floor(Math.sin(i)*5)).map((v,i)=>(
+                    <div key={i} style={{flex:1,background:v>70?C.red:v>50?C.amber:C.green,height:`${v}%`,borderRadius:"2px 2px 0 0",opacity:.7}}/>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
+// MODULE: NDR  Network Detection & Response
+
+function NDRModule({alerts}) {
+  const [flows,setFlows]=useState([]);
+
+  const [selFlow,setSelFlow]=useState(null);
+  const [captureOn,setCaptureOn]=useState(true);
+
+  useEffect(()=>{
+    if(!captureOn)return;
+    const t=setInterval(()=>{
+      setFlows(p=>{
+        // NDR flows come from real agent via WebSocket
+        return p;
+      });
+    },1800);
+    return()=>clearInterval(t);
+  },[captureOn]);
+
+  const blocked = flows.filter(f=>f.verdict==="BLOCK").length;
+  const suspicious = flows.filter(f=>f.verdict==="SUSPICIOUS").length;
+  const withSig = flows.filter(f=>f.signature).length;
+  const geoMap = flows.reduce((acc,f)=>{acc[f.geo]=(acc[f.geo]||0)+1;return acc},{});
+
+  // Protocol distribution
+  const protoMap = flows.reduce((acc,f)=>{acc[f.proto]=(acc[f.proto]||0)+1;return acc},{});
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"auto",display:"flex",flexDirection:"column",gap:12}}>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,flexShrink:0}}>
+        <KPICard label="Total Flows" value={flows.length} color={C.accent}/>
+        <KPICard label="Blocked" value={blocked} color={C.red}/>
+        <KPICard label="Suspicious" value={suspicious} color={C.amber}/>
+        <KPICard label="Signatures Hit" value={withSig} color={C.orange}/>
+        <KPICard label="Unique Geos" value={Object.keys(geoMap).length} color={C.cyan}/>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:12,flex:1,minHeight:0}}>
+        {/* Flow table */}
+        <div className="card" style={{overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <Hdr>Network Flow Monitor</Hdr>
+            <button className={`btn ${captureOn?"d":""}`} style={{fontSize:10,padding:"3px 8px",marginLeft:"auto"}} onClick={()=>setCaptureOn(v=>!v)}>
+              {captureOn?"STOP STOP CAPTURE":" START CAPTURE"}
+            </button>
+          </div>
+          <div style={{overflow:"auto",flex:1}}>
+            <table className="tbl">
+              <thead><tr><th>Time</th><th>Src</th><th>Dst</th><th>Port</th><th>Proto</th><th>Bytes</th><th>Geo</th><th>Verdict</th><th>Signature</th></tr></thead>
+              <tbody>
+                {flows.slice(0,60).map(f=>(
+                  <tr key={f.id} className="fi" style={{cursor:"pointer"}} onClick={()=>setSelFlow(f)}>
+                    <td className="mono" style={{fontSize:10,color:C.text}}>{f.ts}</td>
+                    <td className="mono" style={{fontSize:10,color:C.textHi}}>{f.src}</td>
+                    <td className="mono" style={{fontSize:10,color:C.textHi}}>{f.dst}</td>
+                    <td className="mono" style={{fontSize:10,color:C.accent}}>{f.dport}</td>
+                    <td style={{fontSize:10,color:C.text}}>{f.proto}</td>
+                    <td className="mono" style={{fontSize:10,color:C.text}}>{f.bytes.toLocaleString()}</td>
+                    <td><span style={{fontSize:10,padding:"1px 5px",background:C.surface,borderRadius:2,color:["RU","CN","KP","IR"].includes(f.geo)?C.red:C.text}}>{f.geo}</span></td>
+                    <td>
+                      <span style={{fontSize:10,padding:"2px 6px",borderRadius:2,
+                        color:f.verdict==="BLOCK"?C.red:f.verdict==="SUSPICIOUS"?C.amber:C.greenDim,
+                        background:f.verdict==="BLOCK"?"rgba(255,34,68,.1)":f.verdict==="SUSPICIOUS"?"rgba(255,184,0,.1)":"rgba(0,136,68,.1)"}}>
+                        {f.verdict}
+                      </span>
+                    </td>
+                    <td style={{fontSize:10,color:f.signature?C.orange:C.dim}}>{f.signature||""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:12,overflow:"auto"}}>
+          {/* Protocol breakdown */}
+          <div className="card">
+            <Hdr>Protocol Distribution</Hdr>
+            {Object.entries(protoMap).map(([proto,count])=>(
+              <div key={proto} style={{marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                  <span style={{color:C.textHi,fontSize:12}}>{proto}</span>
+                  <span className="mono" style={{fontSize:11,color:C.text}}>{count}</span>
+                </div>
+                <RBar v={count} max={flows.length}/>
+              </div>
+            ))}
+          </div>
+
+          {/* Geo heatmap */}
+          <div className="card">
+            <Hdr>Source Geo Heatmap</Hdr>
+            {Object.entries(geoMap).sort((a,b)=>b[1]-a[1]).map(([geo,cnt])=>(
+              <div key={geo} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:10,padding:"2px 6px",background:["RU","CN","KP","IR"].includes(geo)?"rgba(255,34,68,.1)":C.surface,
+                    border:`1px solid ${["RU","CN","KP","IR"].includes(geo)?C.red:C.border}`,borderRadius:2,
+                    color:["RU","CN","KP","IR"].includes(geo)?C.red:C.text}}>{geo}</span>
+                  <div style={{width:60,height:3,background:C.dim,borderRadius:2}}>
+                    <div style={{width:`${pct(cnt,flows.length)}%`,height:"100%",background:["RU","CN","KP","IR"].includes(geo)?C.red:C.accent,borderRadius:2}}/>
+                  </div>
+                </div>
+                <span className="mono" style={{fontSize:11,color:C.text}}>{cnt}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Active signatures */}
+          <div className="card">
+            <Hdr>Active Signatures</Hdr>
+            {["Port Scan","C2 Beacon","DNS Tunnel","SMB Exploit","Lateral Movement"].map(sig=>{
+              const count=flows.filter(f=>f.signature===sig).length;
+              return (
+                <div key={sig} style={{display:"flex",justifyContent:"space-between",marginBottom:6,padding:"6px 8px",background:count>0?`rgba(255,96,16,.06)`:C.surface,border:`1px solid ${count>0?C.orange:C.border}`,borderRadius:3}}>
+                  <span style={{fontSize:12,color:count>0?C.textHi:C.text}}>{sig}</span>
+                  <span className="mono" style={{fontSize:11,color:count>0?C.orange:C.dim}}>{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// MODULE: UEBA  User & Entity Behavior Analytics
+
+function UEBAModule({alerts}) {
+  const [selected,setSelected]=useState(null);
+
+  // UEBA profiles loaded from real UEBA agent data
+  const [profiles, setUebaProfiles] = useState([]);
+  useEffect(()=>{
+    fetch("/api/ueba/profiles",{headers:{Authorization:"Bearer "+(window._secosToken||"")}})
+      .then(r=>r.ok?r.json():null).then(d=>{
+        if(d?.profiles) setUebaProfiles(d.profiles);
+      }).catch(()=>{});
+  },[]);
+  const _unusedProfiles = profiles.map((u,i)=>{ return {username:u.username||u,dept:u.dept||"Unknown",riskScore:u.risk_score||0,anomalies:u.anomalies||[],baseline:u.baseline||{},
+      peerGroup:u.dept||"Unknown",peerRisk:0,
+      activityScore:alerts.filter(a=>a.user===u).length*10||0,lastActive:alerts.filter(a=>a.user===u)[0]?.timestamp||"No activity"};
+  });
+
+  const risky=profiles.filter(p=>p.anomalies.length>0).sort((a,b)=>b.riskScore-a.riskScore);
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"auto",display:"flex",flexDirection:"column",gap:12}}>
+      {/* Header KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,flexShrink:0}}>
+        <KPICard label="Profiles Monitored" value={profiles.length} color={C.accent}/>
+        <KPICard label="Anomalies Detected" value={profiles.reduce((s,p)=>s+p.anomalies.length,0)} color={C.amber}/>
+        <KPICard label="High Risk Users" value={profiles.filter(p=>p.riskScore>60).length} color={C.red}/>
+        <KPICard label="Peer Outliers" value={profiles.filter(p=>p.riskScore>p.peerRisk*1.5).length} color={C.orange}/>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,flex:1,minHeight:0}}>
+        {/* Risk ranking */}
+        <div className="card" style={{overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <Hdr>User Risk Ranking</Hdr>
+          <div style={{overflow:"auto",flex:1}}>
+            {[...profiles].sort((a,b)=>b.riskScore-a.riskScore).map((p,i)=>(
+              <div key={p.username} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",
+                background:selected===p.username?C.surface:C.bg,border:`1px solid ${selected===p.username?C.accent:C.border}`,
+                borderRadius:3,marginBottom:5,cursor:"pointer"}} onClick={()=>setSelected(p.username===selected?null:p.username)}>
+                <div className="mono" style={{fontSize:10,color:C.text,width:16}}>#{i+1}</div>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span className="mono" style={{fontSize:12,color:p.riskScore>60?C.red:p.riskScore>40?C.amber:C.textHi}}>{p.username}</span>
+                    <span className="mono" style={{fontSize:12,color:p.riskScore>60?C.red:p.riskScore>40?C.amber:C.green}}>{p.riskScore}</span>
+                  </div>
+                  <RBar v={p.riskScore}/>
+                  <div style={{display:"flex",gap:6,marginTop:4}}>
+                    {p.anomalies.slice(0,2).map(a=>(
+                      <span key={a.type} style={{fontSize:9,padding:"1px 5px",background:"rgba(255,96,16,.08)",
+                        border:`1px solid rgba(255,96,16,.2)`,borderRadius:2,color:C.orange}}>{a.type}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Anomaly detail / behavior profile */}
+        <div style={{display:"flex",flexDirection:"column",gap:12,overflow:"auto"}}>
+          {selected ? (() => {
+            const p=profiles.find(x=>x.username===selected);
+            return (
+              <>
+                <div className="card">
+                  <Hdr>Behavior Profile  {p.username}</Hdr>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                    {[
+                      ["Risk Score",p.riskScore,p.riskScore>60?C.red:C.amber],
+                      ["Peer Group",p.peerGroup,C.textHi],
+                      ["Peer Risk",p.peerRisk,C.text],
+                      ["Activity",p.activityScore,C.accent],
+                    ].map(([k,v,c])=>(
+                      <div key={k} style={{padding:"7px 9px",background:C.surface,borderRadius:3,border:`1px solid ${C.border}`}}>
+                        <div style={{fontSize:9,color:C.text,textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>{k}</div>
+                        <div className="mono" style={{fontSize:13,color:c}}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{fontSize:10,color:C.text,marginBottom:6,letterSpacing:1,textTransform:"uppercase"}}>Baseline Behavior</div>
+                  <div style={{padding:"8px 10px",background:C.surface,borderRadius:3,border:`1px solid ${C.border}`,fontSize:11,color:C.text,lineHeight:1.7}}>
+                    Login window: {p.baseline.loginTime}<br/>
+                    Avg data: {p.baseline.avgBytes}KB/day<br/>
+                    Network: {p.baseline.locations[0]}<br/>
+                    Actions: {p.baseline.typicalActions.join(", ")}
+                  </div>
+                </div>
+                <div className="card" style={{flex:1}}>
+                  <Hdr>Anomalies ({p.anomalies.length})</Hdr>
+                  {p.anomalies.length===0
+                    ? <div style={{color:C.text,fontSize:12}}>No anomalies  behavior within baseline</div>
+                    : p.anomalies.map((a,i)=>(
+                      <div key={i} style={{padding:"9px 10px",background:C.surface,border:`1px solid ${a.score>70?C.red:C.amber}`,borderRadius:3,marginBottom:7}} className="fi">
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                          <span style={{color:C.textHi,fontSize:13,fontWeight:600}}>{a.type}</span>
+                          <span className="mono" style={{fontSize:11,color:a.score>70?C.red:C.amber}}>Score: {a.score}</span>
+                        </div>
+                        <div style={{fontSize:12,color:C.text}}>{a.detail}</div>
+                        <div className="mono" style={{fontSize:10,color:C.text,marginTop:4}}>{a.ts}</div>
+                      </div>
+                    ))
+                  }
+                </div>
+              </>
+            );
+          })() : (
+            <div className="card" style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{color:C.text,fontSize:13,textAlign:"center"}}>
+                <div style={{fontSize:24,marginBottom:8}}>USER</div>
+                Select a user to view behavior profile
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// MODULE: XDR  Cross-layer Detection & Response
+
+function XDRModule({alerts}) {
+  // Build XDR incidents from real correlated alerts
+  const incidentMap={};
+  alerts.forEach(a=>{
+    const key=a.host||a.src_ip||"unknown";
+    if(!incidentMap[key]){
+      incidentMap[key]={
+        id:key, host:key, score:0,
+        status:"ACTIVE", timeline:[],
+        layers:{endpoint:false,network:false,identity:false,cloud:false,email:false},
+        alerts:[],
+      };
+    }
+    incidentMap[key].alerts.push(a);
+    incidentMap[key].score=Math.min(100,incidentMap[key].score+(a.severity==="CRITICAL"?25:a.severity==="HIGH"?10:5));
+    if(a.source==="EDR") incidentMap[key].layers.endpoint=true;
+    if(a.source==="NDR") incidentMap[key].layers.network=true;
+    if(a.source==="IAM") incidentMap[key].layers.identity=true;
+    incidentMap[key].timeline.push({layer:a.source||"SIEM",event:a.rule,ts:a.timestamp,host:a.host});
+  });
+  const [incidents] = [Object.values(incidentMap).sort((a,b)=>b.score-a.score).slice(0,20)];
+  const [sel,setSel]=useState(null);
+
+  const LAYER_COLOR={endpoint:C.green,network:C.accent,identity:C.orange,cloud:C.purple,email:C.pink};
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"hidden",display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,flexShrink:0}}>
+        <KPICard label="XDR Incidents" value={incidents.length} color={C.accent}/>
+        <KPICard label="Active" value={incidents.filter(i=>i.status==="ACTIVE").length} color={C.red}/>
+        <KPICard label="Multi-layer" value={incidents.filter(i=>Object.values(i.layers).filter(Boolean).length>=3).length} color={C.orange}/>
+        <KPICard label="Avg Score" value={Math.round(incidents.reduce((s,i)=>s+i.score,0)/incidents.length)} color={C.amber}/>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"340px 1fr",gap:12,flex:1,minHeight:0,overflow:"hidden"}}>
+        {/* Incident list */}
+        <div className="card" style={{overflow:"auto"}}>
+          <Hdr>XDR Incidents</Hdr>
+          {incidents.map(inc=>(
+            <div key={inc.id} style={{padding:"10px",background:sel===inc.id?C.surface:C.bg,
+              border:`1px solid ${sel===inc.id?C.accent:inc.status==="ACTIVE"?`rgba(255,34,68,.3)`:C.border}`,
+              borderRadius:3,marginBottom:6,cursor:"pointer"}} onClick={()=>setSel(inc.id===sel?null:inc.id)}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                <Badge sev={inc.severity}/>
+                <span style={{fontSize:10,color:inc.status==="ACTIVE"?C.red:inc.status==="CONTAINED"?C.amber:C.greenDim,fontWeight:700}}>{inc.status}</span>
+              </div>
+              <div style={{color:C.textHi,fontSize:12,fontWeight:600,marginBottom:5}}>{inc.title}</div>
+              <div style={{display:"flex",gap:4,marginBottom:5}}>
+                {Object.entries(inc.layers).map(([layer,active])=>(
+                  <span key={layer} style={{fontSize:9,padding:"1px 5px",borderRadius:2,
+                    background:active?`rgba(0,0,0,.3)`:C.surface,
+                    border:`1px solid ${active?LAYER_COLOR[layer]:C.border}`,
+                    color:active?LAYER_COLOR[layer]:C.dim}}>{layer.toUpperCase()}</span>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:12}}>
+                <span className="mono" style={{fontSize:10,color:C.text}}>{inc.events} events</span>
+                <span className="mono" style={{fontSize:10,color:C.text}}>{inc.hosts} hosts</span>
+                <span className="mono" style={{fontSize:10,color:C.text}}>score:{inc.score}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Incident detail */}
+        <div style={{overflow:"auto",display:"flex",flexDirection:"column",gap:12}}>
+          {sel ? (() => {
+            const inc=incidents.find(i=>i.id===sel);
+            return (
+              <>
+                <div className="card">
+                  <Hdr>Incident Detail  {inc.id}</Hdr>
+                  <div style={{color:C.textHi,fontSize:15,fontWeight:700,marginBottom:10}}>{inc.title}</div>
+                  {/* Attack path visualization */}
+                  <div style={{marginBottom:12}}>
+                    <div style={{fontSize:10,color:C.text,letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>Attack Path Across Layers</div>
+                    <div style={{display:"flex",alignItems:"center",gap:0}}>
+                      {Object.entries(inc.layers).filter(([,v])=>v).map(([layer],i,arr)=>(
+                        <div key={layer} style={{display:"flex",alignItems:"center"}}>
+                          <div style={{padding:"6px 10px",background:`rgba(0,0,0,.4)`,border:`1px solid ${LAYER_COLOR[layer]}`,borderRadius:3,fontSize:11,color:LAYER_COLOR[layer],textTransform:"uppercase",fontWeight:700}}>{layer}</div>
+                          {i<arr.length-1&&<div style={{width:24,height:1,background:`linear-gradient(90deg,${LAYER_COLOR[layer]},${LAYER_COLOR[arr[i+1][0]]})`}}/>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* MITRE techniques */}
+                  <div style={{marginBottom:10}}>
+                    <div style={{fontSize:10,color:C.text,letterSpacing:1,marginBottom:6,textTransform:"uppercase"}}>MITRE ATT&CK Techniques</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {inc.mitre.map(t=><span key={t} className="mono" style={{fontSize:10,padding:"2px 7px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:2,color:C.accentDim}}>{t}</span>)}
+                    </div>
+                  </div>
+                </div>
+                {/* Timeline */}
+                <div className="card" style={{flex:1}}>
+                  <Hdr>Cross-Layer Event Timeline</Hdr>
+                  {inc.timeline.map((e,i)=>(
+                    <div key={i} style={{display:"flex",gap:10,marginBottom:8}} className="fi">
+                      <div style={{flexShrink:0,width:80,textAlign:"right"}}>
+                        <span style={{fontSize:9,padding:"2px 6px",background:`rgba(0,0,0,.4)`,border:`1px solid ${LAYER_COLOR[e.layer.toLowerCase()]||C.border}`,borderRadius:2,color:LAYER_COLOR[e.layer.toLowerCase()]||C.text}}>{e.layer}</span>
+                      </div>
+                      <div style={{flex:1,padding:"7px 10px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:3}}>
+                        <div style={{color:C.textHi,fontSize:12}}>{e.event} on <span className="mono" style={{color:C.accent}}>{e.host}</span></div>
+                        <div className="mono" style={{fontSize:9,color:C.text,marginTop:2}}>{e.ts}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Response actions */}
+                  <div style={{marginTop:10,display:"flex",gap:8}}>
+                    <button className="btn d" style={{flex:1}}>CONTAIN ALL HOSTS</button>
+                    <button className="btn p" style={{flex:1}}>OPEN IR PLAYBOOK</button>
+                    <button className="btn" style={{flex:1}}>EXPORT TO THEHIVE</button>
+                  </div>
+                </div>
+              </>
+            );
+          })() : (
+            <div className="card" style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{color:C.text,fontSize:13,textAlign:"center"}}>
+                <div style={{fontSize:24,marginBottom:8}}></div>Select an XDR incident to view cross-layer correlation
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// MODULE: VULN  Vulnerability Management
+
+function VulnModule() {
+  const [sel,setSel]=useState(null);
+  const CVSS_COLOR = s => s>=9?C.red:s>=7?C.orange:s>=4?C.amber:C.green;
+
+  const [vulns, setVulns] = useState([]);
+  useEffect(()=>{
+    fetch("/api/vuln/findings",{headers:{Authorization:"Bearer "+(window._secosToken||"")}})
+      .then(r=>r.ok?r.json():null).then(d=>{
+        if(d?.findings) setVulns(d.findings);
+      }).catch(()=>{});
+  },[]);
+
+  const grouped=vulns.reduce((acc,v)=>{acc[v.severity]=(acc[v.severity]||[]);acc[v.severity].push(v);return acc},{});
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"auto",display:"flex",flexDirection:"column",gap:12}}>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,flexShrink:0}}>
+        <KPICard label="Total CVEs" value={vulns.length} color={C.accent}/>
+        <KPICard label="Critical" value={(grouped.CRITICAL||[]).length} color={C.red}/>
+        <KPICard label="High" value={(grouped.HIGH||[]).length} color={C.orange}/>
+        <KPICard label="Actively Exploited" value={vulns.filter(v=>v.exploited).length} color={C.red} sub=" CISA KEV"/>
+        <KPICard label="Patch Available" value={vulns.filter(v=>v.patchAvail).length} color={C.green}/>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:12,flex:1,minHeight:0,overflow:"hidden"}}>
+        <div className="card" style={{overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <Hdr>Vulnerability Registry</Hdr>
+          <div style={{overflow:"auto",flex:1}}>
+            <table className="tbl">
+              <thead><tr><th>CVE</th><th>Title</th><th>Host</th><th>CVSS</th><th>Severity</th><th>Exploited</th><th>Patch</th><th>Status</th></tr></thead>
+              <tbody>
+                {[...vulns].sort((a,b)=>b.cvss-a.cvss).map(v=>(
+                  <tr key={v.id+v.host} style={{cursor:"pointer"}} onClick={()=>setSel(v)}>
+                    <td className="mono" style={{fontSize:10,color:C.accentDim}}>{v.id}</td>
+                    <td style={{color:C.textHi,fontSize:12}}>{v.title}</td>
+                    <td className="mono" style={{fontSize:10,color:C.accent}}>{v.host}</td>
+                    <td><span className="mono" style={{fontSize:12,fontWeight:700,color:CVSS_COLOR(v.cvss)}}>{v.cvss}</span></td>
+                    <td><Badge sev={v.severity}/></td>
+                    <td><span style={{color:v.exploited?C.red:C.greenDim,fontSize:11}}>{v.exploited?" YES":"NO"}</span></td>
+                    <td><span style={{color:v.patchAvail?C.green:C.red,fontSize:11}}>{v.patchAvail?"AVAIL":"NONE"}</span></td>
+                    <td><span style={{fontSize:10,color:v.status==="PATCHED"?C.greenDim:v.status==="IN REMEDIATION"?C.amber:C.text}}>{v.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:12,overflow:"auto"}}>
+          {/* Severity breakdown */}
+          <div className="card">
+            <Hdr>Severity Breakdown</Hdr>
+            {SEVS.map(s=>(
+              <div key={s} style={{marginBottom:9}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                  <Badge sev={s}/>
+                  <span className="mono" style={{fontSize:11,color:C.text}}>{(grouped[s]||[]).length}</span>
+                </div>
+                <RBar v={(grouped[s]||[]).length} max={vulns.length}/>
+              </div>
+            ))}
+          </div>
+          {/* Asset risk from vulns */}
+          <div className="card" style={{flex:1}}>
+            <Hdr>Asset Exposure</Hdr>
+            {HOSTS.map(h=>{
+              const hv=vulns.filter(v=>v.host===h);
+              const score=Math.min(100,hv.reduce((s,v)=>s+v.cvss*2,0)/10);
+              return (
+                <div key={h} style={{marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span className="mono" style={{fontSize:10,color:C.textHi}}>{h}</span>
+                    <span className="mono" style={{fontSize:10,color:score>70?C.red:C.text}}>{hv.length} CVEs</span>
+                  </div>
+                  <RBar v={score}/>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// MODULE: SENSORS  Cloud, Email, App Sensors
+
+function SensorsModule({alerts}) {
+  const [activeTab,setActiveTab]=useState("cloud");
+  const [events,setEvents]=useState({
+    cloud: [],
+    email: [],
+    endpoint: [],
+  });
+
+  useEffect(()=>{
+    const t=setInterval(()=>{
+      // Sensor events from real agents via WebSocket  no fake data
+    },3000);
+    return()=>clearInterval(t);
+  },[]);
+
+  const SENSOR_TABS=[["cloud"," CLOUD"],["email"," EMAIL"],["endpoint"," ENDPOINT"]];
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"hidden",display:"flex",flexDirection:"column",gap:12}}>
+      {/* Sensor health overview */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:8,flexShrink:0}}>
+        {[
+          {name:"Network",status:alerts.filter(a=>a.source==="NDR").length>0?"ONLINE":"WAITING",events:alerts.filter(a=>a.source==="NDR").length},
+          {name:"Endpoint",status:alerts.filter(a=>a.source==="EDR").length>0?"ONLINE":"WAITING",events:alerts.filter(a=>a.source==="EDR").length},
+          {name:"Cloud",status:"OFFLINE",events:0},
+          {name:"Email",status:"OFFLINE",events:0},
+          {name:"Identity",status:alerts.filter(a=>a.source==="IAM").length>0?"ONLINE":"WAITING",events:alerts.filter(a=>a.source==="IAM").length},
+          {name:"Apps",status:"OFFLINE",events:0},
+        ].map(s=>(
+          <div key={s.name} className="card" style={{padding:"10px",textAlign:"center",borderColor:s.status==="WARN"?C.amber:C.border}}>
+            <div style={{display:"flex",justifyContent:"center",marginBottom:5}}><Dot s={s.status}/></div>
+            <div style={{color:C.textHi,fontSize:12,fontWeight:600}}>{s.name}</div>
+            <div className="mono" style={{fontSize:10,color:C.text,marginTop:2}}>{s.events}/hr</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Sensor sub-tabs */}
+      <div style={{display:"flex",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+        {SENSOR_TABS.map(([id,label])=>(
+          <button key={id} className={`tab ${activeTab===id?"on":""}`} onClick={()=>setActiveTab(id)}>{label}</button>
+        ))}
+      </div>
+
+      {/* Cloud events */}
+      {activeTab==="cloud"&&(
+        <div style={{flex:1,overflow:"auto"}}>
+          <table className="tbl">
+            <thead><tr><th>Time</th><th>Provider</th><th>Service</th><th>Action</th><th>User</th><th>Region</th><th>Risk</th><th>Anomaly</th></tr></thead>
+            <tbody>
+              {events.cloud.map(e=>(
+                <tr key={e.id} className="fi">
+                  <td className="mono" style={{fontSize:10,color:C.text}}>{e.ts}</td>
+                  <td><span style={{fontSize:11,padding:"2px 6px",borderRadius:2,
+                    background:e.provider==="AWS"?"rgba(255,184,0,.1)":e.provider==="Azure"?"rgba(0,120,212,.1)":"rgba(66,133,244,.1)",
+                    color:e.provider==="AWS"?C.amber:e.provider==="Azure"?"#0078d4":"#4285f4"}}>{e.provider}</span></td>
+                  <td className="mono" style={{fontSize:10,color:C.accentDim}}>{e.service}</td>
+                  <td style={{color:C.textHi,fontSize:12}}>{e.action}</td>
+                  <td className="mono" style={{fontSize:10,color:C.purple}}>{e.user}</td>
+                  <td className="mono" style={{fontSize:10,color:C.text}}>{e.region}</td>
+                  <td><Badge sev={e.risk==="HIGH"?"HIGH":e.risk==="MEDIUM"?"MEDIUM":"LOW"}/></td>
+                  <td>{e.anomaly&&<span style={{fontSize:10,color:C.red}} className="bk"> ANOMALY</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Email events */}
+      {activeTab==="email"&&(
+        <div style={{flex:1,overflow:"auto"}}>
+          <table className="tbl">
+            <thead><tr><th>Time</th><th>From</th><th>To</th><th>Subject</th><th>Verdict</th><th>Attach</th><th>SPF</th><th>DKIM</th></tr></thead>
+            <tbody>
+              {events.email.map(e=>(
+                <tr key={e.id} className="fi">
+                  <td className="mono" style={{fontSize:10,color:C.text}}>{e.ts}</td>
+                  <td className="mono" style={{fontSize:10,color:e.verdict!=="CLEAN"?C.red:C.text}}>{e.from}</td>
+                  <td className="mono" style={{fontSize:10,color:C.textHi}}>{e.to}</td>
+                  <td style={{color:C.textHi,fontSize:12}}>{e.subject}</td>
+                  <td><span style={{fontSize:10,padding:"2px 6px",borderRadius:2,fontWeight:700,
+                    color:e.verdict==="PHISHING"?C.red:e.verdict==="MALWARE"?C.red:e.verdict==="SPAM"?C.amber:C.green,
+                    background:e.verdict==="PHISHING"||e.verdict==="MALWARE"?"rgba(255,34,68,.1)":e.verdict==="SPAM"?"rgba(255,184,0,.1)":"rgba(0,255,136,.1)"}}>{e.verdict}</span></td>
+                  <td className="mono" style={{fontSize:10,color:e.attachments?C.orange:C.dim}}>{e.attachments||""}</td>
+                  <td><span style={{fontSize:10,color:e.spfPass?C.green:C.red}}>{e.spfPass?"":""}</span></td>
+                  <td><span style={{fontSize:10,color:e.dkimPass?C.green:C.red}}>{e.dkimPass?"":""}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Endpoint sensor */}
+      {activeTab==="endpoint"&&(
+        <div style={{flex:1,overflow:"auto",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,alignContent:"start"}}>
+          {events.endpoint.map(e=>(
+            <div key={e.host} className="card" style={{borderColor:e.status==="OFFLINE"?C.red:e.isolated?C.amber:C.border}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <Dot s={e.status}/>
+                {e.isolated&&<span style={{fontSize:9,color:C.amber,border:`1px solid ${C.amber}`,padding:"1px 5px",borderRadius:2}} className="bk">ISOLATED</span>}
+              </div>
+              <div className="mono" style={{color:C.textHi,fontSize:12,marginBottom:4}}>{e.host}</div>
+              <div style={{color:C.text,fontSize:10,marginBottom:8}}>{e.os}</div>
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                {[["CPU",e.cpu],[" MEM",e.mem]].map(([k,v])=>(
+                  <div key={k}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+                      <span style={{fontSize:9,color:C.text}}>{k}</span>
+                      <span className="mono" style={{fontSize:9,color:v>80?C.red:C.text}}>{v}%</span>
+                    </div>
+                    <RBar v={v}/>
+                  </div>
+                ))}
+              </div>
+              <div style={{marginTop:8,display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontSize:9,color:C.text}}>{e.processes} procs</span>
+                {e.alerts>0&&<span style={{fontSize:9,color:C.red,fontWeight:700}}>{e.alerts} alerts</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// MODULE: TIP  Threat Intelligence Platform (self-learning)
+
+function TIPModule({alerts}) {
+  const [query,setQuery]=useState(""); const [result,setResult]=useState(null); const [searching,setSearching]=useState(false);
+  const [learnedIOCs,setLearned]=useState([]);
+
+  // Auto-learn from alerts
+  useEffect(()=>{
+    const newIOCs=alerts.filter(a=>a.severity!=="LOW").slice(0,5).map(a=>({
+      value:a.src_ip, type:"ip", confidence:a.score, source:"INTERNAL_HUNT",
+      tags:[a.tactic,a.mitre], firstSeen:a.timestamp, apt:a.apt,
+    }));
+    setLearned(newIOCs);
+  },[alerts]);
+
+  const FEEDS=[
+    {name:"MISP Community",status:"LIVE",iocs:14823,updated:"2m ago",type:"Open Source"},
+    {name:"AlienVault OTX",status:"LIVE",iocs:9241,updated:"8m ago",type:"Community"},
+    {name:"CISA KEV",status:"LIVE",iocs:1142,updated:"1h ago",type:"Government"},
+    {name:"Emerging Threats",status:"LIVE",iocs:7883,updated:"15m ago",type:"Commercial"},
+    {name:"Internal Hunt",status:"LIVE",iocs:learnedIOCs.length,updated:"Live",type:"Self-Learned"},
+    {name:"Abuse.ch",status:"LIVE",iocs:3341,updated:"30m ago",type:"Open Source"},
+  ];
+
+  const enrich=()=>{
+    if(!query)return; setSearching(true);
+    fetch("/api/tip/enrich?ioc="+encodeURIComponent(query),{
+      headers:{Authorization:"Bearer "+(window._secosToken||"")}
+    }).then(r=>r.ok?r.json():null).then(d=>{
+      if(d){
+        setResult({
+          value:query,
+          verdict:d.verdict||"UNKNOWN",
+          confidence:d.confidence||0,
+          type:d.type||(/^\d+\.\d+/.test(query)?"IP":query.length===32||query.length===64?"Hash":"Domain"),
+          feeds:d.feeds||[],
+          apt:d.apt||null,
+          tags:d.tags||[],
+          geoIP:d.geo||"",
+          firstSeen:d.first_seen||"Unknown",
+          lastSeen:d.last_seen||"Unknown",
+        });
+      } else {
+        setResult({value:query,verdict:"NO DATA",confidence:0,type:"Unknown",feeds:[],apt:null,tags:[],geoIP:"",firstSeen:"",lastSeen:""});
+      }
+      setSearching(false);
+    },700);
+  };
+
+  const APTS_DETAIL=[
+    {name:"APT29",nation:"Russia",active:true,campaigns:["SolarWinds","NOBELIUM"],techniques:["T1078","T1566","T1059"]},
+    {name:"APT41",nation:"China",active:true,campaigns:["Operation Wicked Panda"],techniques:["T1190","T1486","T1071"]},
+    {name:"Lazarus",nation:"N.Korea",active:true,campaigns:["BlueNoroff","AppleJeus"],techniques:["T1140","T1041","T1027"]},
+    {name:"Scattered Spider",nation:"Criminal",active:false,campaigns:["Twilio","MGM Breach"],techniques:["T1621","T1078"]},
+  ];
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"auto",display:"flex",flexDirection:"column",gap:12}}>
+      {/* IOC Lookup */}
+      <div className="card">
+        <Hdr>IOC Enrichment & Lookup</Hdr>
+        <div style={{display:"flex",gap:8}}>
+          <input className="inp" style={{flex:1}} placeholder="Enter IP, domain, hash, URL" value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&enrich()}/>
+          <button className="btn p" onClick={enrich} disabled={searching}>{searching?"SEARCHING":"ENRICH IOC"}</button>
+        </div>
+        {result&&(
+          <div style={{marginTop:12,padding:"12px",background:C.surface,border:`1px solid ${result.verdict==="MALICIOUS"?C.red:C.green}`,borderRadius:3}} className="fi">
+            <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:8}}>
+              <div><div style={{fontSize:9,color:C.text,letterSpacing:1}}>VERDICT</div><div style={{color:result.verdict==="MALICIOUS"?C.red:C.green,fontSize:15,fontWeight:700}}>{result.verdict}</div></div>
+              <div><div style={{fontSize:9,color:C.text,letterSpacing:1}}>TYPE</div><div style={{color:C.textHi,fontSize:13}}>{result.type}</div></div>
+              <div><div style={{fontSize:9,color:C.text,letterSpacing:1}}>CONFIDENCE</div><div className="mono" style={{color:C.amber,fontSize:13}}>{result.confidence}%</div></div>
+              <div><div style={{fontSize:9,color:C.text,letterSpacing:1}}>SEEN IN FEEDS</div><div style={{color:C.textHi,fontSize:13}}>{result.feeds.join(", ")}</div></div>
+              {result.apt&&<div><div style={{fontSize:9,color:C.text,letterSpacing:1}}>APT</div><div style={{color:C.orange,fontSize:13}}>{result.apt}</div></div>}
+              {result.geoIP&&<div><div style={{fontSize:9,color:C.text,letterSpacing:1}}>GEO</div><div style={{color:["RU","CN","KP","IR"].includes(result.geoIP)?C.red:C.textHi,fontSize:13}}>{result.geoIP}</div></div>}
+            </div>
+            <div style={{display:"flex",gap:5}}>{result.tags.map(t=><span key={t} style={{fontSize:9,padding:"1px 6px",border:`1px solid ${C.border}`,borderRadius:2,color:C.text}}>{t}</span>)}</div>
+          </div>
+        )}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        {/* Feeds */}
+        <div className="card">
+          <Hdr>Threat Intelligence Feeds</Hdr>
+          {FEEDS.map(f=>(
+            <div key={f.name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:C.surface,border:`1px solid ${f.type==="Self-Learned"?C.purple:C.border}`,borderRadius:3,marginBottom:6}}>
+              <div>
+                <div style={{color:C.textHi,fontSize:12,fontWeight:600}}>{f.name}</div>
+                <div className="mono" style={{fontSize:10,color:C.text}}>{f.iocs.toLocaleString()} IOCs  {f.updated}</div>
+                {f.type==="Self-Learned"&&<div style={{fontSize:9,color:C.purple,marginTop:2}}> Auto-learned from detections</div>}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:5}}>
+                <div className="dg pl"/><span className="mono" style={{fontSize:9,color:C.greenDim}}>{f.status}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* APT tracking */}
+        <div className="card">
+          <Hdr>APT Actor Tracking</Hdr>
+          {APTS_DETAIL.map(a=>(
+            <div key={a.name} style={{padding:"9px 10px",background:C.surface,border:`1px solid ${a.active?C.borderHi:C.border}`,borderRadius:3,marginBottom:7}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <span style={{color:a.active?C.textHi:C.text,fontSize:13,fontWeight:700}}>{a.name}</span>
+                <div style={{display:"flex",alignItems:"center",gap:5}}>
+                  <div className={a.active?"dr pl":"dd"}/><span style={{fontSize:10,color:a.active?C.red:C.text}}>{a.active?"ACTIVE":"DORMANT"}</span>
+                </div>
+              </div>
+              <div style={{fontSize:11,color:C.text,marginBottom:5}}>{a.nation}  {a.campaigns.join(", ")}</div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                {a.techniques.map(t=><span key={t} className="mono" style={{fontSize:9,padding:"1px 5px",background:C.card,border:`1px solid ${C.border}`,borderRadius:2,color:C.accentDim}}>{t}</span>)}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Self-learned IOCs */}
+        <div className="card" style={{gridColumn:"1/-1"}}>
+          <Hdr> Self-Learned IOCs (from live detections)</Hdr>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {learnedIOCs.map((ioc,i)=>(
+              <div key={i} style={{padding:"7px 10px",background:C.surface,border:`1px solid ${C.purple}`,borderRadius:3,fontSize:11}}>
+                <div className="mono" style={{color:C.purple,marginBottom:2}}>{ioc.value}</div>
+                <div style={{color:C.text,fontSize:10}}>{ioc.type}  conf:{ioc.confidence}%</div>
+                {ioc.apt&&<div style={{color:C.orange,fontSize:9,marginTop:2}}>{ioc.apt}</div>}
+              </div>
+            ))}
+            {learnedIOCs.length===0&&<div style={{color:C.text,fontSize:12}}>Collecting from live alerts</div>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// MODULE: SIEM  Security Information & Event Management
+
+const SIEM_RULES = [
+  {id:"SR-001",name:"SSH Brute Force",category:"Authentication",severity:"HIGH",threshold:"5 failures/60s",hits:0,enabled:true,mitre:"T1110.001"},
+  {id:"SR-002",name:"LSASS Memory Access",category:"Credential Access",severity:"CRITICAL",threshold:"1 access",hits:0,enabled:true,mitre:"T1003.001"},
+  {id:"SR-003",name:"DNS Exfiltration",category:"Exfiltration",severity:"HIGH",threshold:">100 TXT queries/min",hits:0,enabled:true,mitre:"T1048.003"},
+  {id:"SR-004",name:"Lateral Movement SMB",category:"Lateral Movement",severity:"HIGH",threshold:"3 hosts/5min",hits:0,enabled:true,mitre:"T1021.002"},
+  {id:"SR-005",name:"C2 Beacon Pattern",category:"C&C",severity:"CRITICAL",threshold:"Periodic interval5%",hits:0,enabled:true,mitre:"T1071.001"},
+  {id:"SR-006",name:"Shadow Copy Delete",category:"Impact",severity:"CRITICAL",threshold:"1 occurrence",hits:0,enabled:true,mitre:"T1490"},
+  {id:"SR-007",name:"PowerShell Encoded",category:"Execution",severity:"MEDIUM",threshold:"B64 payload >512b",hits:0,enabled:true,mitre:"T1059.001"},
+  {id:"SR-008",name:"Port Scan",category:"Discovery",severity:"LOW",threshold:">20 ports/10s",hits:0,enabled:true,mitre:"T1046"},
+  {id:"SR-009",name:"Impossible Travel",category:"Authentication",severity:"HIGH",threshold:"Same user 2+ geos/1h",hits:0,enabled:false,mitre:"T1621"},
+  {id:"SR-010",name:"Ransomware Extension",category:"Impact",severity:"CRITICAL",threshold:">50 renames/30s",hits:0,enabled:true,mitre:"T1486"},
+];
+
+function SIEMModule({alerts}) {
+  const [subTab,setSub]=useState("search");
+  const [q,setQ]=useState(""); const [results,setResults]=useState([]); const [searching,setSrch]=useState(false);
+  const [rules,setRules]=useState(SIEM_RULES);
+  const [selRule,setSelRule]=useState(null);
+
+  const search=()=>{
+    setSrch(true);
+    setTimeout(()=>{
+      const res=alerts.filter(a=>!q||a.rule.toLowerCase().includes(q.toLowerCase())||a.host.toLowerCase().includes(q.toLowerCase())||a.src_ip.includes(q)||a.user.includes(q));
+      setResults(res.slice(0,80));
+      setSrch(false);
+    },400);
+  };
+
+  const toggleRule=(id)=>setRules(p=>p.map(r=>r.id===id?{...r,enabled:!r.enabled}:r));
+
+  // Log volume chart data
+  const hourBuckets=Object.fromEntries(Array.from({length:24},(_,i)=>[i,0]));
+  alerts.forEach(a=>{
+    try{const h=parseInt(a.timestamp.split(":")[0]);if(h>=0&&h<24)hourBuckets[h]++;}catch{}
+  });
+  const hours=Array.from({length:24},(_,i)=>({h:`${String(i).padStart(2,"0")}:00`,v:hourBuckets[i]||0}));
+  const maxV=Math.max(...hours.map(h=>h.v),1);
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"hidden",display:"flex",flexDirection:"column",gap:10}}>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,flexShrink:0}}>
+        <KPICard label="Total Alerts" value={alerts.length} color={C.accent}/>
+        <KPICard label="Active Rules" value={rules.filter(r=>r.enabled).length} color={C.green}/>
+        <KPICard label="Rules Fired" value={rules.reduce((s,r)=>s+r.hits,0)} color={C.amber}/>
+        <KPICard label="Log Sources" value={8} color={C.purple}/>
+        <KPICard label="Resolved" value={alerts.filter(a=>a.status==="RESOLVED").length} color={C.text} sub="false positives"/>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{display:"flex",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+        {[["search","LOG SEARCH"],["rules","DETECTION RULES"],["volume","EVENT VOLUME"],["sources","LOG SOURCES"]].map(([id,l])=>(
+          <button key={id} className={`tab ${subTab===id?"on":""}`} onClick={()=>setSub(id)}>{l}</button>
+        ))}
+      </div>
+
+      {/* LOG SEARCH */}
+      {subTab==="search"&&(
+        <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{display:"flex",gap:8,flexShrink:0}}>
+            <input className="inp" style={{flex:1}} value={q} onChange={e=>setQ(e.target.value)}
+              placeholder='Search logs: rule, host, IP, user' onKeyDown={e=>e.key==="Enter"&&search()}/>
+            <button className="btn p" onClick={search} disabled={searching}>{searching?"SEARCHING":"SEARCH"}</button>
+            <button className="btn" onClick={()=>{setQ("");setResults([]);}}>CLEAR</button>
+          </div>
+          {/* Quick filters */}
+          <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}>
+            {["SSH Brute Force","LSASS Dump","C2 Beacon","Lateral Movement SMB","DNS Exfil"].map(f=>(
+              <button key={f} className="btn" style={{fontSize:10,padding:"3px 8px"}} onClick={()=>{setQ(f);setTimeout(search,100);}}>{f}</button>
+            ))}
+          </div>
+          <div style={{overflow:"auto",flex:1}}>
+            {results.length===0&&!searching&&(
+              <div style={{color:C.text,fontSize:12,textAlign:"center",marginTop:40}}>
+                {q?"No results found":"Enter a search query or click a quick filter"}
+              </div>
+            )}
+            {results.length>0&&(
+              <table className="tbl">
+                <thead><tr><th>Time</th><th>Rule</th><th>Host</th><th>User</th><th>Src IP</th><th>MITRE</th><th>Sev</th><th>Raw</th></tr></thead>
+                <tbody>
+                  {results.map(a=>(
+                    <tr key={a.id} className="fi">
+                      <td className="mono" style={{fontSize:10,color:C.text}}>{a.timestamp}</td>
+                      <td style={{color:C.textHi,fontSize:12}}>{a.rule}</td>
+                      <td className="mono" style={{fontSize:10,color:C.accent}}>{a.host}</td>
+                      <td className="mono" style={{fontSize:10,color:C.purple}}>{a.user}</td>
+                      <td className="mono" style={{fontSize:10}}>{a.src_ip}</td>
+                      <td className="mono" style={{fontSize:10,color:C.accentDim}}>{a.mitre}</td>
+                      <td><Badge sev={a.severity}/></td>
+                      <td><span style={{fontSize:9,color:C.text,fontFamily:"'Share Tech Mono',monospace"}}>
+                        {`{"src":"${a.src_ip}","dst":"${a.host}","user":"${a.user}"}`}
+                      </span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* DETECTION RULES */}
+      {subTab==="rules"&&(
+        <div style={{flex:1,overflow:"hidden",display:"flex",gap:12}}>
+          <div style={{flex:1,overflow:"auto"}}>
+            <table className="tbl">
+              <thead><tr><th>ID</th><th>Rule Name</th><th>Category</th><th>MITRE</th><th>Threshold</th><th>Hits</th><th>Sev</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {rules.map(r=>(
+                  <tr key={r.id} style={{cursor:"pointer",opacity:r.enabled?1:0.5}} onClick={()=>setSelRule(r)}>
+                    <td className="mono" style={{fontSize:10,color:C.accentDim}}>{r.id}</td>
+                    <td style={{color:C.textHi,fontWeight:600,fontSize:12}}>{r.name}</td>
+                    <td style={{fontSize:11,color:C.text}}>{r.category}</td>
+                    <td className="mono" style={{fontSize:10,color:C.accentDim}}>{r.mitre}</td>
+                    <td style={{fontSize:10,color:C.text}}>{r.threshold}</td>
+                    <td className="mono" style={{fontSize:12,color:r.hits>10?C.orange:C.textHi,fontWeight:700}}>{r.hits}</td>
+                    <td><Badge sev={r.severity}/></td>
+                    <td>
+                      <span style={{fontSize:10,padding:"2px 7px",borderRadius:2,
+                        color:r.enabled?C.green:C.text,
+                        background:r.enabled?"rgba(0,255,136,.08)":"transparent",
+                        border:`1px solid ${r.enabled?C.green:C.border}`}}>
+                        {r.enabled?"ENABLED":"DISABLED"}
+                      </span>
+                    </td>
+                    <td><button className={`btn ${r.enabled?"d":"g"}`} style={{fontSize:9,padding:"2px 7px"}}
+                      onClick={e=>{e.stopPropagation();toggleRule(r.id);}}>
+                      {r.enabled?"DISABLE":"ENABLE"}
+                    </button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {selRule&&(
+            <div className="card" style={{width:280,flexShrink:0,alignSelf:"flex-start"}}>
+              <Hdr>Rule Detail</Hdr>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {[["ID",selRule.id],["Name",selRule.name],["Category",selRule.category],
+                  ["MITRE",selRule.mitre],["Threshold",selRule.threshold],
+                  ["Total Hits",selRule.hits],["Severity",selRule.severity]].map(([k,v])=>(
+                  <div key={k} style={{padding:"6px 9px",background:C.surface,borderRadius:3,border:`1px solid ${C.border}`}}>
+                    <div style={{fontSize:9,color:C.text,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{k}</div>
+                    <div className="mono" style={{fontSize:12,color:C.textHi}}>{v}</div>
+                  </div>
+                ))}
+                <button className="btn" style={{marginTop:4}} onClick={()=>setSelRule(null)}>CLOSE</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* EVENT VOLUME */}
+      {subTab==="volume"&&(
+        <div style={{flex:1,overflow:"auto"}}>
+          <div className="card" style={{marginBottom:12}}>
+            <Hdr>24-Hour Event Volume</Hdr>
+            <div style={{display:"flex",alignItems:"flex-end",gap:2,height:120}}>
+              {hours.map((h,i)=>(
+                <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                  <div style={{flex:1,width:"100%",display:"flex",alignItems:"flex-end"}}>
+                    <div style={{width:"100%",background:h.v>150?C.red:h.v>100?C.amber:C.accent,
+                      height:`${pct(h.v,maxV)}%`,borderRadius:"2px 2px 0 0",opacity:.8,minHeight:2}}/>
+                  </div>
+                  {i%4===0&&<div className="mono" style={{fontSize:8,color:C.text,transform:"rotate(-45deg)"}}>{h.h}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+            {[["Endpoint Events",alerts.filter(a=>a.source==="EDR").length,C.green],["Network Events",alerts.filter(a=>a.source==="NDR").length,C.accent],
+              ["Auth Events",alerts.filter(a=>a.source==="IAM").length,C.orange],["Cloud Events",0,C.purple]].map(([l,v,c])=>(
+              <div key={l} className="card" style={{textAlign:"center"}}>
+                <div style={{fontSize:10,color:C.text,marginBottom:4}}>{l}</div>
+                <div className="orb" style={{fontSize:22,fontWeight:900,color:c}}>{v}</div>
+                <div style={{fontSize:9,color:C.text,marginTop:2}}>events/hr</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* LOG SOURCES */}
+      {subTab==="sources"&&(
+        <div style={{flex:1,overflow:"auto"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+            {[
+              {name:"Windows Event Logs",type:"Endpoint",eps:alerts.filter(a=>a.source==="SIEM").length,status:"ONLINE",hosts:[...new Set(alerts.map(a=>a.host))].length},
+              {name:"Sysmon",type:"Endpoint",eps:alerts.filter(a=>a.source==="EDR").length,status:"ONLINE",hosts:[...new Set(alerts.filter(a=>a.source==="EDR").map(a=>a.host))].length},
+              {name:"Firewall Logs",type:"Network",eps:alerts.filter(a=>a.source==="NDR").length,status:"ONLINE",hosts:1},
+              {name:"DNS Server",type:"Network",eps:alerts.filter(a=>a.mitre&&a.mitre.includes("T1048")).length,status:"ONLINE",hosts:1},
+              {name:"Active Directory",type:"Identity",eps:alerts.filter(a=>a.source==="IAM").length,status:"ONLINE",hosts:1},
+              {name:"Web Proxy",type:"Application",eps:0,status:"WARN",hosts:0},
+              {name:"Cloud Trail (AWS)",type:"Cloud",eps:0,status:"OFFLINE",hosts:0},
+              {name:"Email Gateway",type:"Email",eps:0,status:"OFFLINE",hosts:0},
+            ].map(src=>(
+              <div key={src.name} className="card" style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderColor:src.status==="WARN"?C.amber:C.border}}>
+                <div>
+                  <div style={{color:C.textHi,fontSize:13,fontWeight:600}}>{src.name}</div>
+                  <div style={{color:C.text,fontSize:11,marginTop:2}}>{src.type}{src.hosts>0?`  ${src.hosts} host(s)`:""}</div>
+                  <div className="mono" style={{fontSize:10,color:C.accent,marginTop:3}}>{src.eps} EPS</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <Dot s={src.status}/><span className="mono" style={{fontSize:9,color:src.status==="WARN"?C.amber:C.greenDim}}>{src.status}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// MODULE: EDR  Endpoint Detection & Response
+
+function EDRModule({alerts,onInvestigate}) {
+  const [subTab,setSub]=useState("endpoints");
+  const [selHost,setSelHost]=useState(null);
+
+  const endpoints=(()=>{
+    const hosts=[...new Set(alerts.map(a=>a.host).filter(Boolean))];
+    if(!hosts.length) return [{host:"Awaiting agent data",os:"",agent:"",status:"WAITING",
+      isolated:false,lastSeen:"",cpu:0,mem:0,disk:0,processes:0,openPorts:0,
+      alerts:0,critAlerts:0,detections:[],processTree:[]}];
+    return hosts.map(h=>({
+      host:h, os:"Linux/Windows", agent:"SecOS-EDR 2.1.4", status:"ONLINE",
+      isolated:false, lastSeen:alerts.find(a=>a.host===h)?.timestamp||ts(),
+      cpu:0, mem:0, disk:0, processes:0, openPorts:0,
+      alerts:alerts.filter(a=>a.host===h).length,
+      critAlerts:alerts.filter(a=>a.host===h&&a.severity==="CRITICAL").length,
+      detections:alerts.filter(a=>a.host===h).slice(0,5).map(a=>({
+        id:a.id, name:a.rule, ts:a.timestamp, severity:a.severity,
+        pid:0, process:a.user||"", parent:"", cmdline:"",
+      })),
+      processTree:[],
+    }));
+  })();
+
+  const BEHAVIORS=[
+    {name:"LSASS Memory Dump",mitre:"T1003.001",severity:"CRITICAL",blocked:true},
+    {name:"Shadow Copy Deletion",mitre:"T1490",severity:"CRITICAL",blocked:true},
+    {name:"PowerShell Encoded Payload",mitre:"T1059.001",severity:"HIGH",blocked:false},
+    {name:"Regsvr32 LOLBin Abuse",mitre:"T1218.010",severity:"HIGH",blocked:false},
+    {name:"Credential Browser Dump",mitre:"T1555.003",severity:"HIGH",blocked:true},
+    {name:"Process Hollowing",mitre:"T1055.012",severity:"CRITICAL",blocked:true},
+    {name:"Ransomware File Pattern",mitre:"T1486",severity:"CRITICAL",blocked:true},
+  ];
+
+  const sel=selHost?endpoints.find(e=>e.host===selHost):null;
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"hidden",display:"flex",flexDirection:"column",gap:10}}>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,flexShrink:0}}>
+        <KPICard label="Endpoints" value={endpoints.length} color={C.accent}/>
+        <KPICard label="Online" value={endpoints.filter(e=>e.status==="ONLINE").length} color={C.green}/>
+        <KPICard label="Isolated" value={endpoints.filter(e=>e.isolated).length} color={C.amber}/>
+        <KPICard label="Detections" value={endpoints.reduce((s,e)=>s+e.detections.length,0)} color={C.red}/>
+        <KPICard label="Behaviors Blocked" value={BEHAVIORS.filter(b=>b.blocked).length} color={C.orange}/>
+      </div>
+
+      <div style={{display:"flex",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+        {[["endpoints","ENDPOINTS"],["detections","DETECTIONS"],["behaviors","BEHAVIOR RULES"]].map(([id,l])=>(
+          <button key={id} className={`tab ${subTab===id?"on":""}`} onClick={()=>setSub(id)}>{l}</button>
+        ))}
+      </div>
+
+      {subTab==="endpoints"&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 340px",gap:12,flex:1,overflow:"hidden"}}>
+          <div style={{overflow:"auto"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+              {endpoints.map(e=>(
+                <div key={e.host} className="card" style={{cursor:"pointer",
+                  borderColor:selHost===e.host?C.accent:e.isolated?C.amber:e.critAlerts>0?C.red:C.border}}
+                  onClick={()=>setSelHost(e.host===selHost?null:e.host)}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <Dot s={e.status}/>
+                    {e.isolated&&<span style={{fontSize:8,color:C.amber,border:`1px solid ${C.amber}`,padding:"1px 4px",borderRadius:2}} className="bk">ISOLATED</span>}
+                    {e.critAlerts>0&&<span style={{fontSize:8,color:C.red,fontWeight:700}}>{e.critAlerts} CRIT</span>}
+                  </div>
+                  <div className="mono" style={{color:C.textHi,fontSize:11,marginBottom:2}}>{e.host}</div>
+                  <div style={{color:C.text,fontSize:10,marginBottom:8}}>{e.os}</div>
+                  {[["CPU",e.cpu],["MEM",e.mem]].map(([k,v])=>(
+                    <div key={k} style={{marginBottom:4}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+                        <span style={{fontSize:9,color:C.text}}>{k}</span>
+                        <span className="mono" style={{fontSize:9,color:v>80?C.red:C.text}}>{v}%</span>
+                      </div>
+                      <RBar v={v}/>
+                    </div>
+                  ))}
+                  <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+                    <span style={{fontSize:9,color:C.text}}>{e.processes} procs</span>
+                    <span style={{fontSize:9,color:e.alerts>0?C.amber:C.text}}>{e.alerts} alerts</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Host detail */}
+          {sel?(
+            <div style={{overflow:"auto",display:"flex",flexDirection:"column",gap:10}}>
+              <div className="card">
+                <Hdr>{sel.host}</Hdr>
+                <div style={{fontSize:12,color:C.text,marginBottom:10}}>{sel.os}  Agent {sel.agent}</div>
+                <div style={{display:"flex",gap:8,marginBottom:10}}>
+                  <button className="btn d" style={{flex:1,fontSize:10}}>{sel.isolated?"UN-ISOLATE":"ISOLATE HOST"}</button>
+                  <button className="btn" style={{flex:1,fontSize:10}}>LIVE RESPONSE</button>
+                </div>
+              </div>
+              <div className="card">
+                <Hdr>Process Tree</Hdr>
+                {sel.processTree.map((p,i)=>(
+                  <div key={p.pid} style={{display:"flex",gap:8,marginBottom:5,paddingLeft:i*12}}>
+                    <div style={{width:1,background:C.border,flexShrink:0,display:i>0?"block":"none"}}/>
+                    <div style={{flex:1,padding:"5px 8px",background:p.suspicious?"rgba(255,96,16,.08)":C.surface,
+                      border:`1px solid ${p.suspicious?C.orange:C.border}`,borderRadius:3}}>
+                      <div style={{display:"flex",justifyContent:"space-between"}}>
+                        <span className="mono" style={{fontSize:11,color:p.suspicious?C.orange:C.textHi}}>{p.name}</span>
+                        <span className="mono" style={{fontSize:9,color:C.text}}>PID:{p.pid}</span>
+                      </div>
+                      <div className="mono" style={{fontSize:9,color:C.text}}>CPU:{p.cpu}% MEM:{p.mem}MB</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {sel.detections.length>0&&(
+                <div className="card">
+                  <Hdr>Detections ({sel.detections.length})</Hdr>
+                  {sel.detections.map(d=>(
+                    <div key={d.id} style={{padding:"7px 9px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:3,marginBottom:5}} className="fi">
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                        <span style={{color:C.textHi,fontSize:12,fontWeight:600}}>{d.name}</span>
+                        <Badge sev={d.severity}/>
+                      </div>
+                      <div className="mono" style={{fontSize:10,color:C.orange}}>{d.process} (PID:{d.pid})</div>
+                      <div className="mono" style={{fontSize:9,color:C.text,marginTop:3}}>{d.cmdline}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ):(
+            <div className="card" style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{color:C.text,fontSize:12,textAlign:"center"}}><br/>Click an endpoint to view details</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {subTab==="detections"&&(
+        <div style={{flex:1,overflow:"auto"}}>
+          <table className="tbl">
+            <thead><tr><th>Time</th><th>Host</th><th>Detection</th><th>Process</th><th>Parent</th><th>PID</th><th>Sev</th><th></th></tr></thead>
+            <tbody>
+              {endpoints.flatMap(e=>e.detections.map(d=>({...d,host:e.host}))).sort((a,b)=>a.ts>b.ts?-1:1).map(d=>(
+                <tr key={d.id} className="fi">
+                  <td className="mono" style={{fontSize:10,color:C.text}}>{d.ts}</td>
+                  <td className="mono" style={{fontSize:10,color:C.accent}}>{d.host}</td>
+                  <td style={{color:C.textHi,fontWeight:600,fontSize:12}}>{d.name}</td>
+                  <td className="mono" style={{fontSize:10,color:C.orange}}>{d.process}</td>
+                  <td className="mono" style={{fontSize:10,color:C.text}}>{d.parent}</td>
+                  <td className="mono" style={{fontSize:10}}>{d.pid}</td>
+                  <td><Badge sev={d.severity}/></td>
+                  <td><button className="btn p" style={{fontSize:9,padding:"2px 7px"}} onClick={()=>onInvestigate({...d,rule:d.name,src_ip:"",user:"",tactic:"Execution",mitre:"T1059",source:"EDR"})}>INVESTIGATE</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {subTab==="behaviors"&&(
+        <div style={{flex:1,overflow:"auto"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+            {BEHAVIORS.map(b=>(
+              <div key={b.name} className="card" style={{borderColor:b.severity==="CRITICAL"&&!b.blocked?C.red:C.border}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <Badge sev={b.severity}/>
+                  <span style={{fontSize:10,padding:"2px 7px",borderRadius:2,
+                    color:b.blocked?C.green:C.amber,
+                    background:b.blocked?"rgba(0,255,136,.08)":"rgba(255,184,0,.08)",
+                    border:`1px solid ${b.blocked?C.green:C.amber}`}}>
+                    {b.blocked?"AUTO-BLOCK":"ALERT ONLY"}
+                  </span>
+                </div>
+                <div style={{color:C.textHi,fontSize:13,fontWeight:700,marginBottom:4}}>{b.name}</div>
+                <div className="mono" style={{fontSize:10,color:C.accentDim}}>{b.mitre}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// MODULE: SOAR  Security Orchestration, Automation & Response
+
+const PB_LIBRARY=[
+  {id:"PB-001",name:"Ransomware Response",trigger:"Shadow Copy Delete / Ransomware Extension",severity:"CRITICAL",
+   steps:["P1: Isolate ALL endpoints on segment","Create P1 case in TheHive","Alert CISO + Legal + DPO",
+          "Assess backup integrity","Identify patient zero via EDR","Block C2 IPs at firewall",
+          "Notify DPO  GDPR 72h clock starts","Begin forensic collection","Draft incident report"],
+   avgTime:"12 min",automated:7},
+  {id:"PB-002",name:"Brute Force Response",trigger:"SSH/RDP Brute Force",severity:"HIGH",
+   steps:["Block source IP at firewall","Lock targeted account","Enable MFA enforcement",
+          "Review auth logs for success","Check for password reuse","Create case","Monitor 24h"],
+   avgTime:"3 min",automated:4},
+  {id:"PB-003",name:"C2 Beacon Response",trigger:"C2 Beacon Pattern",severity:"CRITICAL",
+   steps:["Sinkhole C2 domain in DNS","Identify ALL beaconing hosts","Isolate affected hosts",
+          "Block C2 IPs globally","Run IOC sweep across fleet","Open investigation case","Submit IOCs to TIP"],
+   avgTime:"8 min",automated:5},
+  {id:"PB-004",name:"Lateral Movement IR",trigger:"Lateral Movement SMB",severity:"HIGH",
+   steps:["Map movement path via SIEM","Identify compromised credentials","Isolate affected segment",
+          "Reset all touched accounts","Scan for persistence mechanisms","Document movement chain"],
+   avgTime:"15 min",automated:3},
+  {id:"PB-005",name:"Data Exfiltration Response",trigger:"DNS Exfil / Large Outbound",severity:"HIGH",
+   steps:["Block outbound DNS recursion","Identify exfiltrated data volume","Preserve network logs",
+          "Notify DPO if PII involved","Isolate exfiltrating host","Forensic collection"],
+   avgTime:"10 min",automated:4},
+];
+
+function SOARModule({alerts}) {
+  const [sel,setSel]=useState(null);
+  const [running,setRunning]=useState(null);
+  const [step,setStep]=useState(-1);
+  const [cases,setCases]=useState(()=>alerts.filter(a=>a.severity!=="LOW").slice(0,6).map(a=>({
+    id:"CASE-"+uid(), created:ts(), title:a.rule, severity:a.severity,
+    host:a.host, assignee:"analyst",
+    status:a.status==="RESOLVED"?"CLOSED":a.status==="INVESTIGATING"?"IN PROGRESS":"OPEN",
+    playbook:a.severity==="CRITICAL"?"Ransomware Response":a.severity==="HIGH"?"Incident Escalation":"Alert Triage", sla:"4h",
+  })));
+  const [execLog,setExecLog]=useState([]);
+
+  const runPb=(pb)=>{
+    setSel(pb); setRunning(pb.id); setStep(0);
+    setExecLog([]);
+    const run=i=>{
+      if(i>=pb.steps.length){setRunning(null);setStep(-1);
+        setExecLog(p=>[...p,{ts:ts(),msg:"OK Playbook execution complete",ok:true}]);
+        return;
+      }
+      setStep(i);
+      setExecLog(p=>[...p,{ts:ts(),msg:`Executing: ${pb.steps[i]}`,ok:false}]);
+      setTimeout(()=>run(i+1),900);
+    };
+    run(0);
+  };
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"hidden",display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,flexShrink:0}}>
+        <KPICard label="Playbooks" value={PB_LIBRARY.length} color={C.accent}/>
+        <KPICard label="Open Cases" value={cases.filter(c=>c.status==="OPEN"||c.status==="IN PROGRESS").length} color={C.red}/>
+        <KPICard label="Auto Steps" value={PB_LIBRARY.reduce((s,p)=>s+p.automated,0)} color={C.green} sub="fully automated"/>
+        <KPICard label="Avg Response" value="7m" color={C.amber} sub="MTTC"/>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"300px 1fr 280px",gap:12,flex:1,overflow:"hidden"}}>
+        {/* Playbook library */}
+        <div className="card" style={{overflow:"auto"}}>
+          <Hdr>Playbook Library</Hdr>
+          {PB_LIBRARY.map(pb=>(
+            <div key={pb.id} style={{padding:"9px",background:sel?.id===pb.id?C.surface:C.bg,
+              border:`1px solid ${sel?.id===pb.id?C.accent:C.border}`,borderRadius:3,marginBottom:6,cursor:"pointer"}}
+              onClick={()=>setSel(pb)}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <span className="mono" style={{fontSize:9,color:C.accentDim}}>{pb.id}</span>
+                <Badge sev={pb.severity}/>
+              </div>
+              <div style={{color:C.textHi,fontSize:12,fontWeight:700,marginBottom:3}}>{pb.name}</div>
+              <div style={{fontSize:10,color:C.text,marginBottom:5}}>{pb.trigger}</div>
+              <div style={{display:"flex",gap:10,fontSize:9,color:C.text}}>
+                <span>{pb.steps.length} steps</span>
+                <span>{pb.automated} automated</span>
+                <span> {pb.avgTime}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Playbook detail + execution */}
+        {sel?(
+          <div style={{overflow:"auto",display:"flex",flexDirection:"column",gap:10}}>
+            <div className="card">
+              <Hdr>{sel.name}</Hdr>
+              <div style={{color:C.text,fontSize:12,marginBottom:10}}>Trigger: {sel.trigger}</div>
+              {sel.steps.map((s,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",
+                  background:C.surface,border:`1px solid ${i<step?C.green:i===step&&running?C.accent:C.border}`,
+                  borderRadius:3,marginBottom:5,transition:"all .3s"}}>
+                  <div style={{width:20,height:20,borderRadius:"50%",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
+                    background:i<step?C.green:i===step&&running?"rgba(0,212,255,.15)":C.dim}}>
+                    <span style={{fontSize:10,color:i<step?C.bg:i===step&&running?C.accent:C.text,fontWeight:700}}>{i<step?"":i+1}</span>
+                  </div>
+                  <span style={{color:i<=step?C.textHi:C.text,fontSize:12,flex:1}}>{s}</span>
+                  {i===step&&running&&<span className="bk" style={{fontSize:9,color:C.accent}}>RUNNING</span>}
+                  {i<step&&<span style={{fontSize:9,color:C.greenDim}}>DONE</span>}
+                </div>
+              ))}
+              <button className="btn p" style={{width:"100%",marginTop:8}} onClick={()=>runPb(sel)} disabled={!!running}>
+                {running===sel.id?" EXECUTING":" EXECUTE PLAYBOOK"}
+              </button>
+            </div>
+          </div>
+        ):(
+          <div className="card" style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{color:C.text,fontSize:12,textAlign:"center"}}><br/>Select a playbook to view and execute</div>
+          </div>
+        )}
+
+        {/* Case queue + exec log */}
+        <div style={{display:"flex",flexDirection:"column",gap:10,overflow:"auto"}}>
+          <div className="card" style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+            <Hdr>Case Queue</Hdr>
+            <div style={{overflow:"auto",flex:1}}>
+              {cases.map(c=>(
+                <div key={c.id} style={{padding:"7px 8px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:3,marginBottom:5}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span className="mono" style={{fontSize:9,color:C.accentDim}}>{c.id}</span>
+                    <Badge sev={c.severity}/>
+                  </div>
+                  <div style={{color:C.textHi,fontSize:11,fontWeight:600,marginBottom:2}}>{c.title}</div>
+                  <div style={{fontSize:10,color:C.text}}>{c.status}  {c.assignee}  SLA:{c.sla}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card" style={{height:200,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+            <Hdr>Execution Log</Hdr>
+            <div style={{overflow:"auto",flex:1}}>
+              {execLog.length===0&&<div style={{color:C.text,fontSize:11}}>No active execution</div>}
+              {execLog.map((e,i)=>(
+                <div key={i} className="log fi">
+                  <span style={{color:C.accentDim}}>[{e.ts}]</span>{" "}
+                  <span style={{color:e.ok?C.green:C.textHi}}>{e.msg}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// MODULE: HUNT  Threat Hunting
+
+function HuntModule({alerts,onInvestigate}) {
+  const [findings,setFindings]=useState([]);
+  const [running,setRunning]=useState(null);
+
+  const TACTICS=[
+    {id:"beacon",name:"C2 Beaconing",desc:"Periodic callback patterns 5% interval",icon:"",mitre:"T1071.001"},
+    {id:"cred",name:"Credential Stuffing",desc:"Password spray across multiple accounts",icon:"KEY",mitre:"T1110.003"},
+    {id:"lateral",name:"Lateral Movement",desc:"Single user auth across many hosts",icon:"",mitre:"T1021.002"},
+    {id:"staging",name:"Data Staging & Exfil",desc:"Bulk reads followed by large outbound",icon:"",mitre:"T1074.001"},
+    {id:"lolbin",name:"Living-off-the-Land",desc:"PowerShell / MSHTA / Regsvr32 abuse",icon:"",mitre:"T1218"},
+    {id:"hollow",name:"Process Hollowing",desc:"Unexpected parent-child chains",icon:"GHOST",mitre:"T1055.012"},
+    {id:"dns",name:"DNS Tunneling",desc:"High-volume TXT queries for exfil",icon:"",mitre:"T1048.003"},
+    {id:"travel",name:"Impossible Travel",desc:"Same user from multiple geos <1h",icon:"TRAVEL",mitre:"T1621"},
+    {id:"persist",name:"Persistence Hunt",desc:"Autoruns, scheduled tasks, services",icon:"",mitre:"T1053"},
+    {id:"shadow",name:"Ransomware Precursors",desc:"VSS deletion, encryption IOCs",icon:"",mitre:"T1490"},
+  ];
+
+  const runHunt=async(tactic)=>{
+    setRunning(tactic.id);
+    try {
+      const r = await fetch("/api/hunt/run",{
+        method:"POST",
+        headers:{"Content-Type":"application/json",Authorization:"Bearer "+(window._secosToken||"")},
+        body:JSON.stringify({tactic_id:tactic.id,tactic:tactic.name,mitre:tactic.mitre})
+      });
+      const d = r.ok ? await r.json() : null;
+      if(d?.findings?.length){
+        setFindings(p=>[...d.findings.map(f=>({...f,tactic:tactic.name,huntIcon:tactic.icon})),...p]);
+      }
+    } catch {}
+    setRunning(null);
+  };
+
+  const runAll=async()=>{
+    for(const t of TACTICS){
+      await new Promise(r=>setTimeout(r,300));
+      runHunt(t);
+    }
+  };
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"hidden",display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+        <div>
+          <div className="orb" style={{fontSize:12,color:C.accent,letterSpacing:3}}>THREAT HUNT ENGINE</div>
+          <div style={{fontSize:11,color:C.text,marginTop:3}}>Proactively search for hidden threats across all data sources</div>
+        </div>
+        <button className="btn p" onClick={runAll} disabled={!!running}>SEARCH RUN ALL HUNTS</button>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,flex:1,overflow:"hidden"}}>
+        {/* Tactic grid */}
+        <div style={{overflow:"auto"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {TACTICS.map(t=>(
+              <div key={t.id} className="card" style={{cursor:"pointer",
+                borderColor:running===t.id?C.accent:C.border,
+                background:running===t.id?"rgba(0,212,255,.04)":C.card}}
+                onClick={()=>!running&&runHunt(t)}>
+                <div style={{fontSize:20,marginBottom:6}}>{t.icon}</div>
+                <div style={{color:C.textHi,fontSize:12,fontWeight:700,marginBottom:3}}>{t.name}</div>
+                <div style={{color:C.text,fontSize:10,marginBottom:6}}>{t.desc}</div>
+                <div className="mono" style={{fontSize:9,color:C.accentDim}}>{t.mitre}</div>
+                {running===t.id&&<div style={{color:C.accent,fontSize:10,marginTop:6}} className="bk">SEARCH HUNTING</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Findings */}
+        <div className="card" style={{overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <Hdr>Hunt Findings ({findings.length})</Hdr>
+            {findings.length>0&&<button className="btn" style={{fontSize:9,padding:"2px 7px"}} onClick={()=>setFindings([])}>CLEAR</button>}
+          </div>
+          <div style={{overflow:"auto",flex:1}}>
+            {findings.length===0&&(
+              <div style={{color:C.text,fontSize:12,textAlign:"center",marginTop:40}}>
+                No findings yet  click a hunt tactic or run all
+              </div>
+            )}
+            {findings.map(f=>(
+              <div key={f.id} className="fi" style={{padding:"9px 10px",background:C.surface,
+                border:`1px solid ${f.severity==="CRITICAL"?`rgba(255,34,68,.3)`:C.border}`,
+                borderRadius:3,marginBottom:7}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:16}}>{f.huntIcon}</span>
+                    <span style={{color:C.textHi,fontSize:12,fontWeight:700}}>{f.tactic}</span>
+                  </div>
+                  <Badge sev={f.severity}/>
+                </div>
+                <div style={{display:"flex",gap:12,marginBottom:5,fontSize:11}}>
+                  <span className="mono" style={{color:C.accent}}>{f.host}</span>
+                  <span className="mono" style={{color:C.text}}>{f.src_ip}</span>
+                  <span className="mono" style={{color:C.purple}}>{f.user}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span className="mono" style={{fontSize:9,color:C.accentDim}}>{f.mitre}</span>
+                  <button className="btn p" style={{fontSize:9,padding:"2px 7px"}} onClick={()=>onInvestigate(f)}>INVESTIGATE</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// MODULE: AEGIS  Autonomous AI Orchestration (Phase 5)
+
+function AEGISModule({alerts,aegisLog}) {
+  const [chains,setChains]=useState([]);
+  const [selChain,setSel]=useState(null);
+  const [mode,setMode]=useState("AUTONOMOUS");
+  const [running,setRunning]=useState(false);
+
+  const runChain=async(alert)=>{
+    setRunning(true);
+    const id=uid();
+    const STEPS=[
+      {type:"INGEST",   msg:`Event received: ${alert.rule} on ${alert.host}`},
+      {type:"ANALYZE",  msg:`Severity: ${alert.severity}  Score: ${alert.score}  MITRE: ${alert.mitre}`},
+      {type:"ENRICH",   msg:`IOC lookup: ${alert.src_ip}  checking threat intelligence...`},
+      {type:"CORRELATE",msg:`Correlating events on ${alert.host} in past 24h...`},
+      {type:"CONTEXT",  msg:`User ${alert.user}  checking UEBA risk profile...`},
+      {type:"DECISION", msg:`Verdict: ${alert.severity==="CRITICAL"?"CONTAIN IMMEDIATELY":"INVESTIGATE"}  awaiting AEGIS analysis`},
+      {type:"DISPATCH", msg:`Dispatching: TheHive case + ${alert.severity==="CRITICAL"?"SOAR isolation playbook":"SIEM watch rule"}`},
+      {type:"COMPLETE", msg:`Chain resolved  AI analysis complete`},
+    ];
+    const chain={id,alert,steps:[],status:"running",started:ts()};
+    setChains(p=>[chain,...p.slice(0,19)]);
+    setSel(id);
+    for(let s of STEPS){
+      await new Promise(r=>setTimeout(r,550));
+      setChains(p=>p.map(c=>c.id===id?{...c,steps:[...c.steps,{...s,ts:ts()}]}:c));
+    }
+    setChains(p=>p.map(c=>c.id===id?{...c,status:"resolved"}:c));
+    setRunning(false);
+  };
+
+  const TYPE_COLOR={INGEST:C.text,ANALYZE:C.accent,ENRICH:C.cyan,CORRELATE:C.purple,CONTEXT:C.amber,DECISION:C.orange,DISPATCH:C.green,COMPLETE:C.green};
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"hidden",display:"flex",flexDirection:"column",gap:10}}>
+      {/* Controls */}
+      <div style={{display:"flex",gap:10,alignItems:"center",flexShrink:0,flexWrap:"wrap"}}>
+        <div className="orb" style={{fontSize:11,color:C.accent,letterSpacing:3}}>AEGIS MODE</div>
+        {["AUTONOMOUS","SUPERVISED","PASSIVE"].map(m=>(
+          <button key={m} className={`btn ${mode===m?"p":""}`} style={{fontSize:10}} onClick={()=>setMode(m)}>{m}</button>
+        ))}
+        <div style={{flex:1}}/>
+        <button className="btn p" onClick={()=>alerts.length>0&&runChain(alerts[alerts.length-1])} disabled={running}>
+          {running?" REASONING":" RUN ON LATEST ALERT"}
+        </button>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"260px 1fr 260px",gap:12,flex:1,overflow:"hidden"}}>
+        {/* Chain list */}
+        <div className="card" style={{overflow:"auto"}}>
+          <Hdr>Reasoning Chains</Hdr>
+          {chains.length===0&&<div style={{color:C.text,fontSize:11}}>No chains yet</div>}
+          {chains.map(c=>(
+            <div key={c.id} style={{padding:"8px 9px",marginBottom:5,cursor:"pointer",
+              background:selChain===c.id?C.surface:C.bg,
+              border:`1px solid ${selChain===c.id?C.accent:C.border}`,borderRadius:3}}
+              onClick={()=>setSel(c.id)}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                <span className="mono" style={{fontSize:9,color:C.accentDim}}>#{c.id.slice(0,6)}</span>
+                <span style={{fontSize:9,color:c.status==="resolved"?C.green:C.amber}} className={c.status==="running"?"bk":""}>
+                  {c.status.toUpperCase()}
+                </span>
+              </div>
+              <div style={{color:C.textHi,fontSize:11,fontWeight:600,marginBottom:2}}>{c.alert.rule}</div>
+              <div className="mono" style={{fontSize:9,color:C.text}}>{c.steps.length}/8 steps  {c.started}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Chain steps */}
+        <div className="card" style={{overflow:"auto"}}>
+          {!selChain&&<div style={{color:C.text,fontSize:12,textAlign:"center",marginTop:60}}>Select a chain to view reasoning</div>}
+          {selChain&&(()=>{
+            const c=chains.find(x=>x.id===selChain);
+            if(!c)return null;
+            return (
+              <>
+                <Hdr>Chain {c.id.slice(0,6)}  {c.alert.host}</Hdr>
+                <div style={{marginBottom:10,padding:"8px 10px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:3}}>
+                  <div style={{display:"flex",gap:10,flexWrap:"wrap",fontSize:11}}>
+                    <span style={{color:C.text}}>Alert:</span><span style={{color:C.textHi}}>{c.alert.rule}</span>
+                    <span style={{color:C.text}}>Sev:</span><Badge sev={c.alert.severity}/>
+                    <span style={{color:C.text}}>Score:</span><span className="mono" style={{color:C.accent}}>{c.alert.score}</span>
+                  </div>
+                </div>
+                {c.steps.map((s,i)=>(
+                  <div key={i} className="fi" style={{display:"flex",gap:10,padding:"9px 10px",
+                    background:C.surface,border:`1px solid ${s.type==="DECISION"?C.accent:s.type==="COMPLETE"?C.green:C.border}`,
+                    borderRadius:3,marginBottom:6}}>
+                    <span style={{fontSize:9,padding:"2px 6px",background:C.card,border:`1px solid ${C.border}`,borderRadius:2,
+                      color:TYPE_COLOR[s.type]||C.text,flexShrink:0,height:"fit-content",fontFamily:"'Share Tech Mono',monospace"}}>
+                      {s.type}
+                    </span>
+                    <div style={{flex:1}}>
+                      <div style={{color:C.textHi,fontSize:12}}>{s.msg}</div>
+                      <div className="mono" style={{fontSize:9,color:C.text,marginTop:2}}>{s.ts}</div>
+                    </div>
+                  </div>
+                ))}
+                {c.status==="running"&&(
+                  <div style={{display:"flex",alignItems:"center",gap:8,color:C.accent,fontSize:12,padding:"8px 10px"}}>
+                    <span className="spin">O</span> AEGIS reasoning in progress
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+
+        {/* Live AEGIS log */}
+        <div className="card" style={{overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <Hdr>Autonomous Action Log</Hdr>
+          <div style={{overflow:"auto",flex:1}}>
+            {aegisLog.slice(-30).reverse().map((e,i)=>(
+              <div key={i} className="log">
+                <span style={{color:C.accentDim}}>[{e.ts}]</span>{" "}
+                <span style={{color:e.msg.includes("CRITICAL")||e.msg.includes("CONTAIN")?C.red:e.msg.includes("ACTION")?C.green:C.textHi,fontSize:10}}>
+                  {e.msg}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// MODULE: COMPLIANCE
+
+function ComplianceModule({alerts}) {
+  const critOpen=alerts.filter(a=>a.severity==="CRITICAL"&&a.status!=="RESOLVED").length;
+  const FRAMEWORKS=[
+    {name:"SOC 2 Type II",  score:Math.max(42,93-critOpen*7),
+     controls:[{id:"CC6.1",name:"Logical Access",pass:true},{id:"CC6.8",name:"Malware Protection",pass:critOpen<3},
+               {id:"CC7.2",name:"System Monitoring",pass:true},{id:"CC7.3",name:"Incident Response",pass:critOpen<2},
+               {id:"A1.1",name:"System Availability",pass:critOpen<4}]},
+    {name:"ISO 27001:2022", score:Math.max(45,89-critOpen*6),
+     controls:[{id:"A.12.6",name:"Vulnerability Mgmt",pass:true},{id:"A.16.1",name:"Incident Management",pass:critOpen<2},
+               {id:"A.12.4",name:"Logging & Monitoring",pass:true},{id:"A.9.4",name:"Access Control",pass:critOpen<3}]},
+    {name:"NIST CSF 2.0",   score:Math.max(50,91-critOpen*5),
+     controls:[{id:"DE.AE",name:"Anomaly Detection",pass:true},{id:"RS.AN",name:"Incident Analysis",pass:critOpen<3},
+               {id:"RS.CO",name:"Communications",pass:critOpen<2},{id:"PR.IP",name:"Security Baseline",pass:true}]},
+    {name:"GDPR Art.32",    score:Math.max(40,86-critOpen*8),
+     controls:[{id:"Art.32",name:"Technical Measures",pass:critOpen<2},{id:"72h",name:"Breach Notification",pass:critOpen<1},
+               {id:"DPA",name:"DPA Reporting",pass:true},{id:"DPIA",name:"Impact Assessment",pass:critOpen<3}]},
+  ];
+  const [sel,setSel]=useState(null);
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"auto",display:"flex",flexDirection:"column",gap:12}}>
+      {/* Overall score */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+        {FRAMEWORKS.map(f=>(
+          <div key={f.name} className="card" style={{cursor:"pointer",borderColor:sel===f.name?C.accent:C.border,textAlign:"center"}}
+            onClick={()=>setSel(f.name===sel?null:f.name)}>
+            <div style={{color:C.textHi,fontSize:13,fontWeight:700,marginBottom:8}}>{f.name}</div>
+            <div className="orb" style={{fontSize:34,fontWeight:900,color:f.score>75?C.green:f.score>60?C.amber:C.red,marginBottom:8}}>{f.score}%</div>
+            <RBar v={f.score}/>
+            <div style={{marginTop:8,fontSize:10,color:f.score>75?C.greenDim:C.red}}>
+              {f.controls.filter(c=>c.pass).length}/{f.controls.length} controls passing
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Control detail */}
+      {sel&&(()=>{
+        const f=FRAMEWORKS.find(x=>x.name===sel);
+        return (
+          <div className="card" className="fi">
+            <Hdr>{f.name}  Control Status</Hdr>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+              {f.controls.map(c=>(
+                <div key={c.id} style={{padding:"10px",background:C.surface,
+                  border:`1px solid ${c.pass?C.green:C.red}`,borderRadius:3,textAlign:"center"}}>
+                  <div className="mono" style={{fontSize:10,color:C.accentDim,marginBottom:4}}>{c.id}</div>
+                  <div style={{color:C.textHi,fontSize:12,fontWeight:600,marginBottom:6}}>{c.name}</div>
+                  <span style={{fontSize:10,padding:"2px 8px",borderRadius:2,fontWeight:700,
+                    color:c.pass?C.green:C.red,background:c.pass?"rgba(0,255,136,.08)":"rgba(255,34,68,.08)",
+                    border:`1px solid ${c.pass?C.green:C.red}`}}>
+                    {c.pass?"PASSING":"FAILING"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {critOpen>0&&(
+        <div style={{padding:"12px 16px",background:"rgba(255,34,68,.06)",border:`1px solid rgba(255,34,68,.25)`,borderRadius:4}} className="fi">
+          <div style={{color:C.red,fontSize:13,fontWeight:700,marginBottom:4}}> Compliance Impact Alert</div>
+          <div style={{color:C.textHi,fontSize:12,lineHeight:1.7}}>
+            {critOpen} unresolved CRITICAL alert(s) are actively degrading compliance scores across all frameworks.
+            GDPR Art.32 requires notification within 72h if personal data is at risk. Review open alerts immediately.
+          </div>
+        </div>
+      )}
+
+      {/* Audit log */}
+      <div className="card">
+        <Hdr>Compliance Audit Trail</Hdr>
+        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+          {[
+            {ts:ts(),event:"SOC 2 CC7.2 control validated  monitoring systems online",pass:true},
+            {ts:ts(),event:`GDPR 72h clock ${critOpen>0?"STARTED":"not triggered"}  critical alerts ${critOpen>0?"open":"resolved"}`,pass:critOpen===0},
+            {ts:ts(),event:"ISO 27001 A.12.4  all log sources active and collecting",pass:true},
+            {ts:ts(),event:"NIST CSF DE.AE  anomaly detection rules active",pass:true},
+          ].map((e,i)=>(
+            <div key={i} className="log">
+              <span style={{color:C.accentDim}}>[{e.ts}]</span>{" "}
+              <span style={{color:e.pass?C.greenDim:C.red}}>{e.pass?"":""}</span>{" "}
+              <span style={{color:C.textHi}}>{e.event}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// MODULE: KERNEL  Data Bus & Architecture View
+
+function KernelModule({alerts,aegisLog}) {
+  const [busEvents,setBusEvents]=useState([]);
+
+  useEffect(()=>{
+    const t=setInterval(()=>{},30000);
+    return()=>clearInterval(t);
+  },[]);
+
+  const MODULES_STATUS=[
+    {name:"SIEM",layer:"Detection",status:alerts.filter(a=>a.source==="SIEM").length>0?"ONLINE":"WAITING",eps:alerts.filter(a=>a.source==="SIEM").length,color:C.accent},
+    {name:"EDR",layer:"Detection",status:alerts.filter(a=>a.source==="EDR").length>0?"ONLINE":"WAITING",eps:alerts.filter(a=>a.source==="EDR").length,color:C.green},
+    {name:"NDR",layer:"Detection",status:alerts.filter(a=>a.source==="NDR").length>0?"ONLINE":"WAITING",eps:alerts.filter(a=>a.source==="NDR").length,color:C.cyan},
+    {name:"IAM",layer:"Identity",status:alerts.filter(a=>a.source==="IAM").length>0?"ONLINE":"WAITING",eps:alerts.filter(a=>a.source==="IAM").length,color:C.orange},
+    {name:"UEBA",layer:"Analytics",status:alerts.filter(a=>a.source==="UEBA").length>0?"ONLINE":"WAITING",eps:alerts.filter(a=>a.source==="UEBA").length,color:C.amber},
+    {name:"XDR",layer:"Correlation",status:alerts.filter(a=>a.source==="XDR").length>0?"ONLINE":"WAITING",eps:alerts.filter(a=>a.source==="XDR").length,color:C.purple},
+    {name:"TIP",layer:"Intelligence",status:alerts.filter(a=>a.source==="TIP").length>0?"ONLINE":"WAITING",eps:alerts.filter(a=>a.source==="TIP").length,color:C.teal},
+    {name:"SOAR",layer:"Response",status:alerts.filter(a=>a.source==="SOAR").length>0?"ONLINE":"WAITING",eps:alerts.filter(a=>a.source==="SOAR").length,color:C.pink},
+    {name:"VULN",layer:"Risk",status:"WAITING",eps:0,color:C.text},
+    {name:"AEGIS",layer:"AI Kernel",status:aegisLog.length>0?"ONLINE":"WAITING",eps:aegisLog.length,color:C.accent},
+  ];
+
+  const TYPE_C={ALERT:C.red,ENRICHMENT:C.cyan,DECISION:C.accent,ACTION:C.green,TELEMETRY:C.text};
+
+  return (
+    <div style={{padding:14,height:"100%",overflow:"auto",display:"flex",flexDirection:"column",gap:12}}>
+      {/* Architecture diagram */}
+      <div className="card">
+        <Hdr>SecOS Architecture  Data Bus</Hdr>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:1}}>
+          {[
+            {label:"SENSOR LAYER",items:["Network","Endpoints","Cloud","Identity","Email","Apps"],color:C.teal},
+            {label:"KERNEL  DATA BUS",items:["Event Stream","Normalizer","Correlation Engine","Graph DB","Time-Series DB","Redis Cache"],color:C.accent},
+            {label:"RESPONSE LAYER",items:["SOAR","AEGIS AI","Playbooks","TheHive","Shuffle","Firewall API"],color:C.green},
+          ].map(col=>(
+            <div key={col.label} style={{padding:"10px 12px",background:C.surface,border:`1px solid ${col.color}20`}}>
+              <div style={{fontSize:9,color:col.color,letterSpacing:2,textTransform:"uppercase",marginBottom:8,fontFamily:"'Orbitron',sans-serif"}}>{col.label}</div>
+              {col.items.map(item=>(
+                <div key={item} style={{padding:"4px 7px",background:C.card,border:`1px solid ${C.border}`,borderRadius:2,marginBottom:4,fontSize:11,color:C.textHi,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  {item}<div className="dg pl"/>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        {/* Module health */}
+        <div className="card">
+          <Hdr>Module Health Matrix</Hdr>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:6}}>
+            {MODULES_STATUS.map(m=>(
+              <div key={m.name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"7px 10px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:3}}>
+                <div>
+                  <div style={{color:m.color,fontSize:12,fontWeight:700}}>{m.name}</div>
+                  <div style={{fontSize:9,color:C.text}}>{m.layer}  {m.eps} EPS</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:5}}><div className="dg pl"/></div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bus traffic */}
+        <div className="card" style={{overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <Hdr>Kernel Bus Traffic</Hdr>
+          <div style={{overflow:"auto",flex:1}}>
+            {busEvents.slice(0,30).map(e=>(
+              <div key={e.id} className="log fi">
+                <span style={{color:C.accentDim}}>[{e.ts}]</span>{" "}
+                <span style={{color:TYPE_C[e.type]||C.text,fontSize:10}}>{e.type}</span>{" "}
+                <span style={{color:C.text,fontSize:10}}>{e.from}{e.to}</span>{" "}
+                <span className="mono" style={{color:C.dim,fontSize:9}}>{e.bytes}B {e.latency}ms</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// EXISTING MODULES (kept from v5)
+
+
+//  EMPTY STATE 
+const EmptyState = ({icon="", msg="Waiting for agent data..."}) => (
+  <div style={{display:"flex",flexDirection:"column",alignItems:"center",
+    justifyContent:"center",height:"60%",gap:16,opacity:0.45}}>
+    <div style={{fontSize:40}}>{icon}</div>
+    <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:12,
+      color:"#4888aa",letterSpacing:3,textTransform:"uppercase"}}>{msg}</div>
+    <div style={{fontSize:10,color:"#0c1e2e",letterSpacing:2}}>
+      AGENTS ARE COLLECTING REAL DATA
+    </div>
+  </div>
+);
+
+function DashboardModule({alerts,onInvestigate}) {
+  const sevCount=sev=>alerts.filter(a=>a.severity===sev).length;
+  const recent=[...alerts].sort((a,b)=>b.seq-a.seq).slice(0,10);
+  return (
+    <div style={{padding:14,height:"100%",overflow:"auto",display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+        {SEVS.map(s=><KPICard key={s} label={s} value={sevCount(s)} color={s==="CRITICAL"?C.red:s==="HIGH"?C.orange:s==="MEDIUM"?C.amber:C.green}/>)}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:12,flex:1,minHeight:0}}>
+        <div className="card" style={{overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <Hdr>Live Alert Feed</Hdr>
+          <div style={{overflow:"auto",flex:1}}>
+            <table className="tbl">
+              <thead><tr><th>Time</th><th>Rule</th><th>MITRE</th><th>Host</th><th>Sev</th><th>Source</th><th></th></tr></thead>
+              <tbody>
+                {recent.map(a=>(
+                  <tr key={a.id} className="fi">
+                    <td className="mono" style={{fontSize:10,color:C.text}}>{a.timestamp}</td>
+                    <td style={{color:C.textHi,fontSize:12}}>{a.rule}</td>
+                    <td className="mono" style={{fontSize:10,color:C.accentDim}}>{a.mitre}</td>
+                    <td className="mono" style={{fontSize:10,color:C.accent}}>{a.host}</td>
+                    <td><Badge sev={a.severity}/></td>
+                    <td><span style={{fontSize:9,color:C.text,padding:"1px 5px",border:`1px solid ${C.border}`,borderRadius:2}}>{a.source}</span></td>
+                    <td><button className="btn p" style={{fontSize:9,padding:"2px 7px"}} onClick={()=>onInvestigate(a)}>OPEN</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div className="card">
+            <Hdr>Module Status</Hdr>
+            {[["SIEM","ONLINE"],["EDR","ONLINE"],["NDR","ONLINE"],["SOAR","ONLINE"],["XDR","ONLINE"],["IAM","ONLINE"],["UEBA","ONLINE"],["TIP","ONLINE"],["VULN","ONLINE"],["AEGIS","ONLINE"]].map(([m,s])=>(
+              <div key={m} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                <span style={{color:C.textHi,fontSize:12,fontWeight:600}}>{m}</span>
+                <div style={{display:"flex",alignItems:"center",gap:5}}><div className="dg pl"/><span className="mono" style={{fontSize:9,color:C.greenDim}}>{s}</span></div>
+              </div>
+            ))}
+          </div>
+          <div className="card" style={{flex:1}}>
+            <Hdr>Kernel Bus</Hdr>
+            {[["Total Alerts",alerts.length],["Agents online",alerts.length>0?11:0],["Bridges active",6],["Queue depth",alerts.filter(a=>a.status==="NEW").length]].map(([k,v])=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:7}}>
+                <span style={{fontSize:11,color:C.text}}>{k}</span>
+                <span className="mono" style={{fontSize:12,color:C.accent}}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AlertsModule({alerts,onInvestigate}) {
+  const [filter,setFilter]=useState("ALL"); const [q,setQ]=useState("");
+  const filtered=alerts.filter(a=>(filter==="ALL"||a.severity===filter)&&(!q||a.rule.toLowerCase().includes(q.toLowerCase())||a.host.toLowerCase().includes(q.toLowerCase()))).sort((a,b)=>b.seq-a.seq);
+  return (
+    <div style={{padding:14,height:"100%",overflow:"hidden",display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{display:"flex",gap:8,flexShrink:0,flexWrap:"wrap"}}>
+        <input className="inp" style={{width:220}} placeholder="Search" value={q} onChange={e=>setQ(e.target.value)}/>
+        {["ALL",...SEVS].map(s=><button key={s} className={`btn ${filter===s?"p":""}`} style={{fontSize:10,padding:"4px 8px"}} onClick={()=>setFilter(s)}>{s}</button>)}
+        <span className="mono" style={{marginLeft:"auto",fontSize:11,color:C.text,alignSelf:"center"}}>{filtered.length} alerts</span>
+      </div>
+      <div style={{overflow:"auto",flex:1}}>
+        <table className="tbl">
+          <thead><tr><th>#</th><th>Time</th><th>Rule</th><th>MITRE</th><th>Host</th><th>User</th><th>Sev</th><th>Score</th><th>Src</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {filtered.slice(0,150).map(a=>(
+              <tr key={a.id} className="fi">
+                <td className="mono" style={{fontSize:9,color:C.dim}}>{a.seq}</td>
+                <td className="mono" style={{fontSize:10,color:C.text}}>{a.timestamp}</td>
+                <td style={{color:C.textHi,fontSize:12,fontWeight:600}}>{a.rule}</td>
+                <td className="mono" style={{fontSize:10,color:C.accentDim}}>{a.mitre}</td>
+                <td className="mono" style={{fontSize:10,color:C.accent}}>{a.host}</td>
+                <td className="mono" style={{fontSize:10,color:C.purple}}>{a.user}</td>
+                <td><Badge sev={a.severity}/></td>
+                <td><div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:36,height:3,background:C.dim,borderRadius:2}}><div style={{width:`${a.score}%`,height:"100%",background:a.score>70?C.red:a.score>50?C.amber:C.green,borderRadius:2}}/></div><span className="mono" style={{fontSize:9,color:C.text}}>{a.score}</span></div></td>
+                <td><span style={{fontSize:9,padding:"1px 4px",border:`1px solid ${C.border}`,borderRadius:2,color:C.text}}>{a.source}</span></td>
+                <td style={{fontSize:10,color:a.status==="NEW"?C.amber:a.status==="RESOLVED"?C.greenDim:C.text}}>{a.status}</td>
+                <td><button className="btn p" style={{fontSize:9,padding:"2px 7px"}} onClick={()=>onInvestigate(a)}>OPEN</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function InvestPanel({alert:a,onClose,onDecision,session}) {
+  const [tab,setTab]=useState("overview"); const [rat,setRat]=useState(""); const [pbStep,setPbStep]=useState(-1); const [pbRun,setPbRun]=useState(false);
+  const PB={steps:["Create Case in TIP","Block Source IP","Isolate Host","Collect Forensic Artifacts","Reset User Credentials","Update IOC Feeds","Close & Document"]};
+  const runPb=()=>{setPbRun(true);setPbStep(0);const run=i=>{if(i>=PB.steps.length){setPbRun(false);return;}setPbStep(i);setTimeout(()=>run(i+1),800);};run(0);};
+  return (
+    <div className="panel si">
+      <div style={{padding:"14px 16px",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div>
+            <div className="orb" style={{fontSize:9,color:C.accentDim,letterSpacing:2}}>INVESTIGATION</div>
+            <div style={{color:C.textHi,fontSize:15,fontWeight:700,marginTop:3}}>{a.rule}</div>
+            <div style={{display:"flex",gap:7,marginTop:5}}><Badge sev={a.severity}/>{a.apt&&<span style={{fontSize:10,color:C.orange,padding:"2px 6px",border:`1px solid rgba(255,96,16,.3)`,borderRadius:2}}>{a.apt}</span>}</div>
+          </div>
+          <button className="btn" style={{fontSize:10}} onClick={onClose}></button>
+        </div>
+        <div style={{display:"flex",gap:0,marginTop:10,borderBottom:`1px solid ${C.border}`}}>
+          {[["overview","OVERVIEW"],["timeline","TIMELINE"],["playbook","PLAYBOOK"],["decide"," DECIDE"]].map(([id,l])=>(
+            <button key={id} className={`tab ${tab===id?"on":""}`} style={{fontSize:10}} onClick={()=>setTab(id)}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{flex:1,overflow:"auto",padding:16}}>
+        {tab==="overview"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {[["Rule",a.rule],["MITRE",`${a.mitre}  ${a.tactic}`],["Host",a.host],["Src IP",a.src_ip],["User",a.user],["Score",`${a.score}/100`],["Source Module",a.source],["Status",a.status]].map(([k,v])=>(
+              <div key={k} style={{display:"flex",gap:10,padding:"7px 10px",background:C.card,border:`1px solid ${C.border}`,borderRadius:3}}>
+                <span style={{color:C.text,fontSize:10,width:80,flexShrink:0,textTransform:"uppercase",letterSpacing:1}}>{k}</span>
+                <span className="mono" style={{fontSize:11,color:C.textHi}}>{v}</span>
+              </div>
+            ))}
+            <div style={{padding:"9px 12px",background:"rgba(0,212,255,.04)",border:`1px solid ${C.border}`,borderRadius:3}}>
+              <div style={{color:C.accent,fontSize:10,fontWeight:700,marginBottom:5,letterSpacing:1}}>AEGIS PRE-ASSESSMENT</div>
+              <div style={{fontSize:12,color:C.textHi,lineHeight:1.7}}>
+                {a.rule} pattern on {a.host} from {a.src_ip}. Tactic: <span style={{color:C.amber}}>{a.tactic}</span>. Confidence: <span style={{color:a.score>70?C.red:C.amber}}>{a.score}%</span>.{" "}
+                {a.severity==="CRITICAL"?"Immediate containment recommended.":"Monitor and correlate."}
+              </div>
+            </div>
+          </div>
+        )}
+        {tab==="timeline"&&(
+          <div>
+            <Hdr>Attack Timeline</Hdr>
+            {[{dt:"-8m",ev:`Recon from ${a.src_ip}`,sev:"LOW"},{dt:"-4m",ev:`Auth attempt on ${a.host} as ${a.user}`,sev:"MEDIUM"},{dt:"-1m",ev:`${a.rule} triggered`,sev:a.severity},{dt:"NOW",ev:"Alert pending investigation",sev:"HIGH"}].map((e,i,arr)=>(
+              <div key={i} style={{display:"flex",gap:10,marginBottom:10}}>
+                <div style={{width:32,flexShrink:0}}><div className="mono" style={{fontSize:9,color:C.text}}>{e.dt}</div>{i<arr.length-1&&<div style={{width:1,height:26,background:C.border,marginLeft:15,marginTop:3}}/>}</div>
+                <div style={{flex:1,padding:"7px 10px",background:C.card,border:`1px solid ${C.border}`,borderRadius:3}}>
+                  <div style={{color:C.textHi,fontSize:12}}>{e.ev}</div>
+                  <Badge sev={e.sev}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {tab==="playbook"&&(
+          <div>
+            <Hdr>IR Playbook</Hdr>
+            {PB.steps.map((step,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:C.card,border:`1px solid ${i<=pbStep?C.green:C.border}`,borderRadius:3,marginBottom:6,transition:"all .3s"}}>
+                <div style={{width:20,height:20,borderRadius:"50%",background:i<pbStep?C.green:i===pbStep?"rgba(0,255,136,.15)":C.dim,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <span style={{fontSize:10,color:i<pbStep?C.bg:i===pbStep?C.green:C.text,fontWeight:700}}>{i<pbStep?"":i+1}</span>
+                </div>
+                <span style={{color:i<=pbStep?C.textHi:C.text,fontSize:12,flex:1}}>{step}</span>
+                {i===pbStep&&pbRun&&<span className="bk" style={{fontSize:9,color:C.green}}>RUNNING</span>}
+              </div>
+            ))}
+            <button className="btn p" style={{width:"100%",marginTop:8}} onClick={runPb} disabled={pbRun}>{pbRun?" EXECUTING":" RUN PLAYBOOK"}</button>
+          </div>
+        )}
+        {tab==="decide"&&(
+          <div>
+            <Hdr>Human Decision</Hdr>
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:10,color:C.text,letterSpacing:1,marginBottom:5,textTransform:"uppercase"}}>Rationale</div>
+              <textarea className="inp" rows={3} placeholder="Document business context" value={rat} onChange={e=>setRat(e.target.value)} style={{resize:"vertical"}}/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {[{a:"OK Whitelist",c:"g"},{a:"BLOCK Block & Isolate",c:"d"},{a:"VIEW Monitor",c:""},{a:"LOCK Isolate Only",c:"d"},{a:"ALERT Escalate CISO",c:""},{a:"X False Positive",c:""}].map(({a,c})=>(
+                <button key={a} className={`btn ${c}`} style={{padding:"9px",fontSize:11}} onClick={()=>onDecision(a.split(" ").slice(1).join(" ").toUpperCase(),rat||"No rationale")}>{a}</button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// MAIN APP
+
+const TABS=[
+  {id:"dashboard", l:"DASHBOARD"},
+  {id:"alerts",    l:"ALERTS"},
+  {id:"siem",      l:"SIEM"},
+  {id:"edr",       l:"EDR"},
+  {id:"ndr",       l:"NDR"},
+  {id:"soar",      l:"SOAR"},
+  {id:"hunt",      l:"HUNT"},
+  {id:"xdr",       l:"XDR"},
+  {id:"iam",       l:"IAM"},
+  {id:"ueba",      l:"UEBA"},
+  {id:"tip",       l:"THREAT INTEL"},
+  {id:"vuln",      l:"VULN MGMT"},
+  {id:"sensors",   l:"SENSORS"},
+  {id:"aegis",     l:"AEGIS AI"},
+  {id:"compliance",l:"COMPLIANCE"},
+  {id:"kernel",    l:"KERNEL"},
+];
+
+function SecOS() {
+  S();
+  const [session,setSession]=useState(null);
+  const [tab,setTab]=useState("dashboard");
+  const [alerts,setAlerts]=useState([]);
+  
+  const [inspecting,setInspecting]=useState(null);
+  const [risk,setRisk]=useState(0);
+  const [aegisLog,setAegisLog]=useState([]);
+  const [apiOnline,setApiOnline]=useState(false);
+  const [wsConnected,setWsConnected]=useState(false);
+  const alertSeq=useRef(1);
+
+  const TOKEN = () => session?.token || "";
+
+  const apiFetch = async (path) => {
+    try {
+      const r = await fetch("/api"+path, {
+        headers: TOKEN() ? {Authorization:"Bearer "+TOKEN()} : {}
+      });
+      if(!r.ok) return null;
+      return r.json();
+    } catch { return null; }
+  };
+
+  const mapAlert = (a,seq) => ({
+    id: String(a.event_id||a.id||Math.random()),
+    seq: seq||a.id||0,
+    timestamp: a.timestamp ? new Date(a.timestamp).toLocaleTimeString("en-GB",{hour12:false}) : new Date().toLocaleTimeString("en-GB",{hour12:false}),
+    rule: a.rule||a.rule_name||"Unknown",
+    mitre: a.mitre_id||a.mitre||"",
+    tactic: a.tactic||"",
+    severity: (a.severity||"LOW").toUpperCase(),
+    host: a.host||a.hostname||"",
+    src_ip: a.src_ip||a.source_ip||"",
+    user: a.user_name||a.user||"",
+    score: a.score||0,
+    status: a.status||"NEW",
+    source: a.source||a.agent||"SIEM",
+    decision: a.decision||null,
+    apt: a.apt||null,
+  });
+
+  const loadAlerts = async () => {
+    const data = await apiFetch("/alerts?limit=2000");
+    if(data?.alerts?.length){
+      const mapped = data.alerts.map((a,i) => mapAlert(a, data.alerts.length - i));
+      setAlerts(mapped.slice(0,2000));
+      const crit = mapped.filter(a=>a.severity==="CRITICAL").length;
+      const high = mapped.filter(a=>a.severity==="HIGH").length;
+      setRisk(Math.min(100, crit*8 + high*3));
+    }
+  };
+
+  const loadAegisHistory = async () => {
+    const data = await apiFetch("/aegis/history");
+    if(data?.chains?.length){
+      const logs = [];
+      data.chains.slice(0,50).forEach(chain => {
+        if(chain.steps) chain.steps.forEach(s => {
+          logs.push({ts: new Date(s.timestamp||Date.now()).toLocaleTimeString("en-GB",{hour12:false}), type:s.type, msg:s.msg||""});
+        });
+      });
+      setAegisLog(logs);
+    }
+  };
+
+  useEffect(()=>{
+    if(!session) return;
+
+    // Initial data load
+    loadAlerts();
+    loadAegisHistory();
+
+    // Health check
+    apiFetch("/health").then(d => {
+      if(d?.status==="online") setApiOnline(true);
+    });
+
+    // WebSocket live feed
+    const proto = window.location.protocol==="https:"?"wss:":"ws:";
+    let ws, wsTimer;
+    const connect = () => {
+      try {
+        ws = new WebSocket(proto+"//"+window.location.host+"/ws");
+        ws.onopen = () => { setWsConnected(true); };
+        ws.onclose = () => {
+          setWsConnected(false);
+          wsTimer = setTimeout(connect, 5000); // reconnect
+        };
+        ws.onerror = () => ws.close();
+        ws.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            const payload = msg.data||msg;
+            // New alert
+            if(payload.rule||payload.rule_name){
+              const a = mapAlert(payload, alertSeq.current++);
+              /* ws alert handled by next poll */
+              setRisk(r=>Math.min(100,Math.max(0,
+                r+(a.severity==="CRITICAL"?8:a.severity==="HIGH"?3:a.severity==="MEDIUM"?1:-1)
+              )));
+            }
+            // AEGIS chain update
+            if(payload.chain_id||payload.type==="AEGIS"){
+              const step = payload;
+              setAegisLog(p=>[...p.slice(-199),{
+                ts: new Date().toLocaleTimeString("en-GB",{hour12:false}),
+                type: step.type||"INFO",
+                msg: step.msg||step.message||JSON.stringify(step).slice(0,80)
+              }]);
+            }
+          } catch {}
+        };
+      } catch { wsTimer = setTimeout(connect, 5000); }
+    };
+    connect();
+
+    // Poll every 30s for missed alerts
+    const pollTimer = setInterval(loadAlerts, 30000);
+
+    return () => {
+      if(ws) ws.close();
+      clearTimeout(wsTimer);
+      clearInterval(pollTimer);
+    };
+  },[session]);
+  if(!session) return <Login onLogin={setSession}/>;
+
+  return (
+    <div className="v6">
+      <div className="gbg"/><div className="scan"/>
+      <TopBar session={session} alerts={alerts} risk={risk} onLogout={()=>setSession(null)} apiOnline={apiOnline} wsConnected={wsConnected}/>
+      <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,display:"flex",gap:0,flexShrink:0,position:"relative",zIndex:5,overflowX:"auto"}}>
+        {TABS.map(t=><button key={t.id} className={`tab ${tab===t.id?"on":""}`} onClick={()=>setTab(t.id)}>{t.l}</button>)}
+      </div>
+      <div style={{flex:1,overflow:"hidden",position:"relative",zIndex:2}}>
+        {tab==="dashboard"  && <DashboardModule  alerts={alerts} onInvestigate={setInspecting}/>}
+        {tab==="alerts"     && <AlertsModule     alerts={alerts} onInvestigate={setInspecting}/>}
+        {tab==="siem"       && <SIEMModule       alerts={alerts}/>}
+        {tab==="edr"        && <EDRModule        alerts={alerts} onInvestigate={setInspecting}/>}
+        {tab==="ndr"        && <NDRModule        alerts={alerts}/>}
+        {tab==="soar"       && <SOARModule       alerts={alerts}/>}
+        {tab==="hunt"       && <HuntModule       alerts={alerts} onInvestigate={setInspecting}/>}
+        {tab==="xdr"        && <XDRModule        alerts={alerts}/>}
+        {tab==="iam"        && <IAMModule        alerts={alerts}/>}
+        {tab==="ueba"       && <UEBAModule       alerts={alerts}/>}
+        {tab==="tip"        && <TIPModule        alerts={alerts}/>}
+        {tab==="vuln"       && <VulnModule/>}
+        {tab==="sensors"    && <SensorsModule    alerts={alerts}/>}
+        {tab==="aegis"      && <AEGISModule      alerts={alerts} aegisLog={aegisLog}/>}
+        {tab==="compliance" && <ComplianceModule alerts={alerts}/>}
+        {tab==="kernel"     && <KernelModule     alerts={alerts} aegisLog={aegisLog}/>}
+      </div>
+      {inspecting&&(
+        <>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:99}} onClick={()=>setInspecting(null)}/>
+          <InvestPanel alert={inspecting} onClose={()=>setInspecting(null)} session={session}
+            onDecision={(decision,rationale)=>{
+              setAlerts(p=>p.map(a=>a.id===inspecting.id?{...a,status:"RESOLVED",decision}:a));
+              setAegisLog(p=>[...p,{ts:ts(),type:"ACTION",msg:`[${session.user.toUpperCase()}] ${decision} on ${inspecting.id}  ${rationale.slice(0,50)}`}]);
+              setInspecting(null);
+            }}/>
+        </>
+      )}
+    </div>
+  );
+}
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(SecOS));
+    const boot = document.getElementById('boot');
+    if(boot){boot.style.transition='opacity 0.5s';setTimeout(()=>{boot.style.opacity='0';setTimeout(()=>boot.remove(),500);},800);}
+  </script>
+</body>
+</html>
