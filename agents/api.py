@@ -489,3 +489,74 @@ if __name__ == "__main__":
     uvicorn.run("api:app", host="0.0.0.0", port=API_PORT,
                 reload=False, log_level="info",
                 access_log=True)
+
+@app.get("/agent/linux")
+async def download_linux_agent():
+    from fastapi.responses import PlainTextResponse
+    script = """#!/usr/bin/env python3
+import os, time, json, socket, hashlib, subprocess, requests
+from datetime import datetime, timezone
+
+SERVER  = os.getenv("SECOS_SERVER", "http://localhost:8000")
+HOST    = os.getenv("AGENT_HOST", socket.gethostname())
+
+def send_alert(rule, severity, score, mitre, tactic, raw=""):
+    try:
+        payload = {
+            "id": hashlib.md5(f"{rule}{HOST}{time.time()}".encode()).hexdigest()[:12].upper(),
+            "rule": rule, "rule_name": rule, "severity": severity,
+            "host": HOST, "src_ip": "", "user_name": "root",
+            "mitre_id": mitre, "tactic": tactic, "score": score,
+            "source": "LINUX_AGENT", "status": "NEW",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        r = requests.post(f"{SERVER}/api/ingest", json=payload, timeout=5)
+        print(f"[ALERT] {severity} {rule} -> {r.status_code}")
+    except Exception as e:
+        print(f"[ERROR] {e}")
+
+def check_auth_log():
+    fail_counts = {}
+    try:
+        with open("/var/log/auth.log") as f:
+            for line in f.readlines()[-200:]:
+                if "Failed password" in line:
+                    parts = line.split()
+                    ip = parts[-4] if len(parts) > 4 else "unknown"
+                    fail_counts[ip] = fail_counts.get(ip, 0) + 1
+        for ip, count in fail_counts.items():
+            if count >= 3:
+                send_alert("SSH Brute Force", "HIGH", 85, "T1110.001", "Credential Access", f"{count} fails from {ip}")
+    except: pass
+
+def check_processes():
+    suspicious = ["mimikatz","meterpreter","netcat","ncat","mshta","certutil","empire","covenant"]
+    try:
+        out = subprocess.check_output(["ps","aux"], text=True).lower()
+        for proc in suspicious:
+            if proc in out:
+                send_alert(f"Suspicious Process: {proc}", "CRITICAL", 95, "T1059", "Execution")
+    except: pass
+
+def check_root_logins():
+    try:
+        out = subprocess.check_output(["last","-n","20"], text=True)
+        for line in out.splitlines():
+            if line.startswith("root") and "pts" in line:
+                send_alert("Root Remote Login", "HIGH", 80, "T1078.001", "Privilege Escalation", line)
+                break
+    except: pass
+
+print(f"SecOS Linux Agent — server: {SERVER}, host: {HOST}")
+last_check = time.time()
+while True:
+    try:
+        check_auth_log()
+        check_processes()
+        check_root_logins()
+        send_alert("Linux Heartbeat", "LOW", 10, "T1082", "Discovery")
+    except Exception as e:
+        print(f"[ERROR] {e}")
+    time.sleep(30)
+"""
+    return PlainTextResponse(script, media_type="text/plain")
