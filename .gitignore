@@ -34,3 +34,7 @@ logs/
 .DS_Store
 Thumbs.db
 *.swp
+nohup.out
+agents/nohup.out
+nohup.out
+agents/nohup.out

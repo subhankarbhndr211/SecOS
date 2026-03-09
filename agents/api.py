@@ -28,7 +28,7 @@ load_dotenv("/etc/secos/.env")
 SECRET_KEY   = os.getenv("SECOS_SECRET_KEY", "dev-secret-change-in-production")
 ALGORITHM    = "HS256"
 TOKEN_EXPIRE = 480  # minutes
-DB_URL       = os.getenv("DATABASE_URL", "postgresql://secos:SecOS@DB2024!@localhost/secosdb")
+DB_URL       = os.getenv("DATABASE_URL", "postgresql://secos:password@localhost/secosdb")
 REDIS_URL    = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 API_PORT     = int(os.getenv("API_PORT", 8000))
 
