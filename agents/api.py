@@ -560,3 +560,19 @@ while True:
     time.sleep(30)
 """
     return PlainTextResponse(script, media_type="text/plain")
+
+@app.get("/install.sh")
+async def install_linux_agent():
+    from fastapi.responses import PlainTextResponse
+    import os
+    server_ip = os.getenv("PUBLIC_IP", "172.25.109.109")
+    with open("/opt/secos/install-agent-linux.sh") as f:
+        script = f.read()
+    return PlainTextResponse(script, media_type="text/plain")
+
+@app.get("/install-agent-windows.ps1")
+async def install_windows_agent():
+    from fastapi.responses import PlainTextResponse
+    with open("/opt/secos/agents/windows/install-agent-windows.ps1") as f:
+        script = f.read()
+    return PlainTextResponse(script, media_type="text/plain")
